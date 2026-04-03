@@ -2,7 +2,7 @@
 
 A shared, reusable conversation engine powered by the Claude API. Provides multi-turn messaging, conversation history, token usage tracking, and an interactive chat loop.
 
-This lives under `core_services/` because it is not a product itself — it is a foundational building block that products like `tutor/` import and build on top of.
+This lives under `core_services/` because it is not a product itself — it is a foundational building block that products import and build on top of.
 
 ## Project Structure
 
@@ -22,7 +22,6 @@ claude/
         test_messages.py             # Tests for MessageHandler
         test_history.py              # Tests for HistoryHandler
         test_send_message.py         # Tests for chat loop
-  tutor/                             # Example product using core_services.chat
 ```
 
 ## Setup
