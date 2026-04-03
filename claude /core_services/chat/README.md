@@ -68,6 +68,18 @@ handler = MessageHandler(client, history, tracker)
 run_chat(handler, tracker)
 ```
 
+### System prompt
+
+A default system prompt is included that guides Claude to help users solve problems on their own. You can override it per product or per message:
+
+```python
+# Custom prompt at init — applies to all messages
+handler = MessageHandler(client, history, tracker, system_prompt="You are a tutor.")
+
+# Override per message
+handler.send("Translate hello", system_prompt="You are a translator.")
+```
+
 ## Running Tests
 
 ```bash

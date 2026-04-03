@@ -1,12 +1,12 @@
 from unittest.mock import MagicMock
 from core_services.chat.api.history import HistoryHandler, USER_ROLE, ASSISTANT_ROLE
-from core_services.chat.api.messages import MessageHandler
+from core_services.chat.api.messages import MessageHandler, DEFAULT_MODEL, DEFAULT_SYSTEM_PROMPT
 from core_services.chat.usage_tracking.tracker import UsageTracker
 
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 DEFAULT_MAX_TOKENS = 1024
 CUSTOM_MODEL = "claude-haiku-4-5-20251001"
 CUSTOM_MAX_TOKENS = 512
+CUSTOM_SYSTEM_PROMPT = "You are a math tutor."
 
 
 def make_mock_client(text, input_tokens=10, output_tokens=5):
@@ -102,3 +102,58 @@ def test_send_tracks_token_usage():
     assert totals["total_output_tokens"] == output_tokens
     assert totals["total_tokens"] == input_tokens + output_tokens
     assert totals["num_turns"] == 1
+
+
+def test_send_uses_default_system_prompt():
+    content = "Help me"
+    expected = "What do you need help with?"
+    mock_client = make_mock_client(expected)
+
+    history = HistoryHandler()
+    tracker = UsageTracker()
+    handler = MessageHandler(mock_client, history, tracker)
+    handler.send(content)
+
+    mock_client.messages.create.assert_called_once_with(
+        model=DEFAULT_MODEL,
+        max_tokens=DEFAULT_MAX_TOKENS,
+        system=DEFAULT_SYSTEM_PROMPT,
+        messages=[{"role": USER_ROLE, "content": content}]
+    )
+
+
+def test_send_with_custom_system_prompt_in_init():
+    content = "What is 2+2?"
+    expected = "Think about counting."
+    mock_client = make_mock_client(expected)
+
+    history = HistoryHandler()
+    tracker = UsageTracker()
+    handler = MessageHandler(mock_client, history, tracker, system_prompt=CUSTOM_SYSTEM_PROMPT)
+    handler.send(content)
+
+    mock_client.messages.create.assert_called_once_with(
+        model=DEFAULT_MODEL,
+        max_tokens=DEFAULT_MAX_TOKENS,
+        system=CUSTOM_SYSTEM_PROMPT,
+        messages=[{"role": USER_ROLE, "content": content}]
+    )
+
+
+def test_send_with_system_prompt_override():
+    content = "Translate hello"
+    expected = "Hola"
+    override_prompt = "You are a translator."
+    mock_client = make_mock_client(expected)
+
+    history = HistoryHandler()
+    tracker = UsageTracker()
+    handler = MessageHandler(mock_client, history, tracker)
+    handler.send(content, system_prompt=override_prompt)
+
+    mock_client.messages.create.assert_called_once_with(
+        model=DEFAULT_MODEL,
+        max_tokens=DEFAULT_MAX_TOKENS,
+        system=override_prompt,
+        messages=[{"role": USER_ROLE, "content": content}]
+    )
