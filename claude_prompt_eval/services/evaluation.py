@@ -9,35 +9,30 @@ from claude_prompt_eval.api.report import EvalReport
 DEFAULT_EVAL_DATASET_SIZE = 3
 
 
-def collect_versions():
-    print("Enter a system prompt to evaluate.\n")
-    prompt_a = input("Prompt A: ")
+def collect_prompt():
+    print("Enter the system prompt you want to evaluate.\n")
+    print("  Example: Answer in one sentence.")
+    print("  Example: Give a thorough explanation with examples.\n")
+    prompt = input("Prompt: ")
     print()
-    prompt_b = input("Prompt B (optional — press Enter to skip): ")
-    print()
-    versions = [PromptVersion(name="A", system_prompt=prompt_a)]
-    if prompt_b:
-        versions.append(PromptVersion(name="B", system_prompt=prompt_b))
-    return versions
+    return PromptVersion(name="A", system_prompt=prompt)
 
 
-def run_eval(versions, cases, verbose=False):
+def run_eval(version, cases, verbose=False):
     from claude_prompt_eval.api.grader import BATCH_SIZE
-    num_versions = len(versions)
     num_cases = len(cases)
-    response_calls = num_versions * num_cases
-    grading_calls = num_versions * -(-num_cases // BATCH_SIZE)
+    response_calls = num_cases
+    grading_calls = -(-num_cases // BATCH_SIZE)
     total_calls = 1 + response_calls + grading_calls
-    version_label = "version" if num_versions == 1 else "versions"
     case_label = "case" if num_cases == 1 else "cases"
-    print(f"\nEvaluating {num_versions} prompt {version_label} x {num_cases} test {case_label}")
+    print(f"\nEvaluating prompt x {num_cases} test {case_label}")
     print(f"~{total_calls} API calls: 1 to generate test cases, {response_calls} for responses, {grading_calls} for grading.\n")
 
     print("Generating responses...")
-    results = EvalRunner(client).run(versions, cases)
+    results = EvalRunner(client).run([version], cases)
 
     print("Grading responses with Claude as judge...")
-    prompt_map = {v.name: v.system_prompt for v in versions}
+    prompt_map = {version.name: version.system_prompt}
     grades = Grader(client).grade(results, prompt_map)
 
     print("Generating report...\n")
@@ -46,20 +41,14 @@ def run_eval(versions, cases, verbose=False):
 
 if __name__ == "__main__":
     print("=== Prompt Eval ===")
-    print("Evaluate a system prompt — or compare two side by side.\n")
+    print("Evaluate a system prompt and get recommendations to improve it.\n")
 
-    print("STEP 1 of 2: Define your prompt versions")
-    print("  Example: Answer in one sentence.")
-    print("  Example: Give a thorough explanation with examples.\n")
-
-    versions = collect_versions()
+    print("STEP 1 of 2: Define your prompt")
+    version = collect_prompt()
 
     print(f"STEP 2 of 2: Generating {DEFAULT_EVAL_DATASET_SIZE} test cases...")
-    generator = CaseGenerator(client)
-    prompt_b = versions[1].system_prompt if len(versions) > 1 else ""
-    cases = generator.generate(
-        versions[0].system_prompt,
-        prompt_b,
+    cases = CaseGenerator(client).generate(
+        version.system_prompt,
         count=DEFAULT_EVAL_DATASET_SIZE,
     )
     print(f"  Generated {len(cases)} test cases.\n")
@@ -69,4 +58,4 @@ if __name__ == "__main__":
     print()
 
     verbose = "--verbose" in sys.argv
-    run_eval(versions, cases, verbose=verbose)
+    run_eval(version, cases, verbose=verbose)

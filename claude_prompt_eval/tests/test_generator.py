@@ -1,10 +1,8 @@
 import json
 from unittest.mock import MagicMock
 from claude_prompt_eval.api.generator import CaseGenerator, GENERATOR_SYSTEM_PROMPT
-from claude_prompt_eval.models import USER_ROLE
 
-PROMPT_A = "Answer in one sentence."
-PROMPT_B = "Give a thorough explanation."
+TEST_PROMPT = "Answer in one sentence."
 
 
 def make_mock_client(questions):
@@ -19,8 +17,7 @@ def test_generate_returns_eval_cases():
     questions = ["What is a variable?", "Explain recursion"]
     mock_client = make_mock_client(questions)
 
-    generator = CaseGenerator(mock_client)
-    cases = generator.generate(PROMPT_A, PROMPT_B, count=2)
+    cases = CaseGenerator(mock_client).generate(TEST_PROMPT, count=2)
 
     assert len(cases) == 2
     assert cases[0].user_message == "What is a variable?"
@@ -29,17 +26,15 @@ def test_generate_returns_eval_cases():
     assert cases[1].name == "test_2"
 
 
-def test_generate_passes_prompts_to_claude():
+def test_generate_passes_prompt_to_claude():
     mock_client = make_mock_client(["question"])
 
-    generator = CaseGenerator(mock_client)
-    generator.generate(PROMPT_A, PROMPT_B, count=5)
+    CaseGenerator(mock_client).generate(TEST_PROMPT, count=5)
 
     call_args = mock_client.messages.create.call_args
     assert call_args.kwargs["system"] == GENERATOR_SYSTEM_PROMPT
     content = call_args.kwargs["messages"][0]["content"]
-    assert PROMPT_A in content
-    assert PROMPT_B in content
+    assert TEST_PROMPT in content
     assert "5" in content
 
 
@@ -49,7 +44,6 @@ def test_generate_handles_invalid_response():
         MagicMock(text="I can't generate questions")
     ]
 
-    generator = CaseGenerator(mock_client)
-    cases = generator.generate(PROMPT_A, PROMPT_B)
+    cases = CaseGenerator(mock_client).generate(TEST_PROMPT)
 
     assert cases == []
