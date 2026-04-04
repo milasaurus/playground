@@ -40,4 +40,13 @@ class ScoreResult:
     score: int
     strengths: str
     weaknesses: str
-    recommendation: str
+
+
+@dataclass
+class GradeReport:
+    """Averaged grade across all test cases for a prompt version."""
+    version_name: str
+    avg_score: float
+    num_cases: int
+    scores: list[ScoreResult]
+    recommendations: list[str]

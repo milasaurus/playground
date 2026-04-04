@@ -1,47 +1,52 @@
+import sys
 from client import client
-from claude_prompt_eval.models import PromptVersion, EvalCase
+from claude_prompt_eval.models import PromptVersion
+from claude_prompt_eval.api.generator import CaseGenerator
 from claude_prompt_eval.api.runner import EvalRunner
-from claude_prompt_eval.api.evaluator import Evaluator
+from claude_prompt_eval.api.grader import Grader
 from claude_prompt_eval.api.report import EvalReport
+
+DEFAULT_EVAL_DATASET_SIZE = 3
 
 
 def collect_versions():
-    print("Enter two system prompts to compare.\n")
+    print("Enter a system prompt to evaluate.\n")
     prompt_a = input("Prompt A: ")
     print()
-    prompt_b = input("Prompt B: ")
+    prompt_b = input("Prompt B (optional — press Enter to skip): ")
     print()
-    return [
-        PromptVersion(name="A", system_prompt=prompt_a),
-        PromptVersion(name="B", system_prompt=prompt_b),
-    ]
+    versions = [PromptVersion(name="A", system_prompt=prompt_a)]
+    if prompt_b:
+        versions.append(PromptVersion(name="B", system_prompt=prompt_b))
+    return versions
 
 
-def collect_case():
-    message = input("What should the user ask? ")
-    print(f"  Added: \"{message}\"\n")
-    return EvalCase(name="test_1", user_message=message)
+def run_eval(versions, cases, verbose=False):
+    from claude_prompt_eval.api.grader import BATCH_SIZE
+    num_versions = len(versions)
+    num_cases = len(cases)
+    response_calls = num_versions * num_cases
+    grading_calls = num_versions * -(-num_cases // BATCH_SIZE)
+    total_calls = 1 + response_calls + grading_calls
+    version_label = "version" if num_versions == 1 else "versions"
+    case_label = "case" if num_cases == 1 else "cases"
+    print(f"\nEvaluating {num_versions} prompt {version_label} x {num_cases} test {case_label}")
+    print(f"~{total_calls} API calls: 1 to generate test cases, {response_calls} for responses, {grading_calls} for grading.\n")
 
-
-def run_eval(versions, cases):
-    print(f"\nEvaluating {len(versions)} prompt versions x {len(cases)} test cases")
-    print(f"This will make {len(versions) * len(cases) * 2} API calls (generation + scoring).\n")
-
-    print("\nRunning evaluation...")
-    print(f"Generating responses... ({len(versions) * len(cases)} API calls)")
+    print("Generating responses...")
     results = EvalRunner(client).run(versions, cases)
 
-    print(f"Scoring responses with Claude as judge... ({len(versions) * len(cases)} API calls)")
+    print("Grading responses with Claude as judge...")
     prompt_map = {v.name: v.system_prompt for v in versions}
-    scores = Evaluator(client).score(results, prompt_map)
+    grades = Grader(client).grade(results, prompt_map)
 
     print("Generating report...\n")
-    print(EvalReport(results, scores, prompt_map).summary())
+    print(EvalReport(results, grades, prompt_map, verbose=verbose).summary())
 
 
 if __name__ == "__main__":
     print("=== Prompt Eval ===")
-    print("Compare different system prompts side by side.\n")
+    print("Evaluate a system prompt — or compare two side by side.\n")
 
     print("STEP 1 of 2: Define your prompt versions")
     print("  Example: Answer in one sentence.")
@@ -49,10 +54,19 @@ if __name__ == "__main__":
 
     versions = collect_versions()
 
-    print("STEP 2 of 2: What should the user ask?")
-    print("  Example: What is a variable?")
-    print("  Example: Explain how recursion works.\n")
+    print(f"STEP 2 of 2: Generating {DEFAULT_EVAL_DATASET_SIZE} test cases...")
+    generator = CaseGenerator(client)
+    prompt_b = versions[1].system_prompt if len(versions) > 1 else ""
+    cases = generator.generate(
+        versions[0].system_prompt,
+        prompt_b,
+        count=DEFAULT_EVAL_DATASET_SIZE,
+    )
+    print(f"  Generated {len(cases)} test cases.\n")
 
-    case = collect_case()
+    for i, case in enumerate(cases, 1):
+        print(f"  {i}. \"{case.user_message}\"")
+    print()
 
-    run_eval(versions, [case])
+    verbose = "--verbose" in sys.argv
+    run_eval(versions, cases, verbose=verbose)

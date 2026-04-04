@@ -4,6 +4,9 @@ chat:
 prompt:
 	source venv/bin/activate && python -m claude_prompt_eval.services.evaluation
 
+prompt-verbose:
+	source venv/bin/activate && python -m claude_prompt_eval.services.evaluation --verbose
+
 test:
 	source venv/bin/activate && python -m pytest claude_conversation_engine/ claude_prompt_eval/ -v
 

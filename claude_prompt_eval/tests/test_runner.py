@@ -1,4 +1,5 @@
-from unittest.mock import MagicMock
+import asyncio
+from unittest.mock import MagicMock, AsyncMock, patch
 from claude_prompt_eval.models import (
     PromptVersion, EvalCase, USER_ROLE, DEFAULT_MODEL, DEFAULT_MAX_TOKENS
 )
@@ -13,17 +14,34 @@ TEST_INPUT_TOKENS = 10
 TEST_OUTPUT_TOKENS = 5
 
 
-def make_mock_client(text=TEST_RESPONSE, input_tokens=TEST_INPUT_TOKENS, output_tokens=TEST_OUTPUT_TOKENS):
+def make_mock_response(text=TEST_RESPONSE, input_tokens=TEST_INPUT_TOKENS, output_tokens=TEST_OUTPUT_TOKENS):
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text=text)]
+    mock_response.usage.input_tokens = input_tokens
+    mock_response.usage.output_tokens = output_tokens
+    return mock_response
+
+
+def make_mock_client():
     mock_client = MagicMock()
-    mock_client.messages.create.return_value.content = [MagicMock(text=text)]
-    mock_client.messages.create.return_value.usage.input_tokens = input_tokens
-    mock_client.messages.create.return_value.usage.output_tokens = output_tokens
+    mock_client.api_key = "test-key"
     return mock_client
 
 
-def test_run_single_version_single_case():
+def make_runner_with_async_mock(responses=None):
     mock_client = make_mock_client()
     runner = EvalRunner(mock_client)
+    mock_async = MagicMock()
+    if responses:
+        mock_async.messages.create = AsyncMock(side_effect=responses)
+    else:
+        mock_async.messages.create = AsyncMock(return_value=make_mock_response())
+    runner.async_client = mock_async
+    return runner, mock_async
+
+
+def test_run_single_version_single_case():
+    runner, _ = make_runner_with_async_mock()
 
     versions = [PromptVersion(name=TEST_VERSION_NAME, system_prompt=TEST_SYSTEM_PROMPT)]
     cases = [EvalCase(name=TEST_CASE_NAME, user_message=TEST_USER_MESSAGE)]
@@ -39,8 +57,7 @@ def test_run_single_version_single_case():
 
 
 def test_run_multiple_versions():
-    mock_client = make_mock_client()
-    runner = EvalRunner(mock_client)
+    runner, _ = make_runner_with_async_mock()
 
     versions = [
         PromptVersion(name="v1", system_prompt="Be concise."),
@@ -51,13 +68,12 @@ def test_run_multiple_versions():
     results = runner.run(versions, cases)
 
     assert len(results) == 2
-    assert results[0].version_name == "v1"
-    assert results[1].version_name == "v2"
+    version_names = {r.version_name for r in results}
+    assert version_names == {"v1", "v2"}
 
 
 def test_run_multiple_cases():
-    mock_client = make_mock_client()
-    runner = EvalRunner(mock_client)
+    runner, _ = make_runner_with_async_mock()
 
     versions = [PromptVersion(name=TEST_VERSION_NAME, system_prompt=TEST_SYSTEM_PROMPT)]
     cases = [
@@ -68,22 +84,33 @@ def test_run_multiple_cases():
     results = runner.run(versions, cases)
 
     assert len(results) == 2
-    assert results[0].test_name == "greeting"
-    assert results[1].test_name == "question"
+    test_names = {r.test_name for r in results}
+    assert test_names == {"greeting", "question"}
 
 
 def test_run_passes_correct_params_to_api():
-    mock_client = make_mock_client()
-    runner = EvalRunner(mock_client)
+    runner, mock_async = make_runner_with_async_mock()
 
     version = PromptVersion(name=TEST_VERSION_NAME, system_prompt=TEST_SYSTEM_PROMPT)
     case = EvalCase(name=TEST_CASE_NAME, user_message=TEST_USER_MESSAGE)
 
     runner.run([version], [case])
 
-    mock_client.messages.create.assert_called_once_with(
+    mock_async.messages.create.assert_called_once_with(
         model=DEFAULT_MODEL,
         max_tokens=DEFAULT_MAX_TOKENS,
         system=TEST_SYSTEM_PROMPT,
         messages=[{"role": USER_ROLE, "content": TEST_USER_MESSAGE}],
     )
+
+
+def test_run_executes_in_parallel():
+    runner, mock_async = make_runner_with_async_mock()
+
+    versions = [PromptVersion(name="v1", system_prompt="Be helpful.")]
+    cases = [EvalCase(name=f"test_{i}", user_message=f"Q{i}") for i in range(5)]
+
+    results = runner.run(versions, cases)
+
+    assert len(results) == 5
+    assert mock_async.messages.create.call_count == 5

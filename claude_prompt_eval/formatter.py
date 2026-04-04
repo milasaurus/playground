@@ -1,4 +1,4 @@
-from claude_prompt_eval.models import EvalResult, ScoreResult
+from claude_prompt_eval.models import EvalResult, ScoreResult, GradeReport
 
 SEPARATOR = "=" * 60
 DIVIDER = "-" * 60
@@ -41,11 +41,20 @@ def format_result(result: EvalResult, score: ScoreResult) -> list[str]:
         f"     What didn't:",
         f"       {score.weaknesses}",
         "",
-        f"     How to improve:",
-        f"       {score.recommendation}",
-        "",
         f"  {DIVIDER}",
     ])
+    return lines
+
+
+def format_recommendations(grade: GradeReport) -> list[str]:
+    lines = [
+        "",
+        f"  HOW TO IMPROVE: {grade.version_name}",
+        DIVIDER,
+    ]
+    for i, rec in enumerate(grade.recommendations, 1):
+        lines.append(f"    {i}. {rec}")
+    lines.append("")
     return lines
 
 

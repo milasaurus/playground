@@ -1,29 +1,38 @@
-from anthropic import Anthropic
+import asyncio
+from anthropic import Anthropic, AsyncAnthropic
 from claude_prompt_eval.models import (
     PromptVersion, EvalCase, EvalResult, USER_ROLE
 )
 
 
 class EvalRunner:
-    """Runs test cases against prompt versions and collects results."""
+    """Runs test cases against prompt versions in parallel."""
 
     def __init__(self, client: Anthropic):
         self.client = client
+        self.async_client = AsyncAnthropic(api_key=client.api_key)
 
     def run(
         self,
         versions: list[PromptVersion],
         test_cases: list[EvalCase],
     ) -> list[EvalResult]:
-        results = []
-        for version in versions:
-            for test_case in test_cases:
-                result = self._run_single(version, test_case)
-                results.append(result)
-        return results
+        return asyncio.run(self._run_all(versions, test_cases))
 
-    def _run_single(self, version: PromptVersion, test_case: EvalCase) -> EvalResult:
-        message = self.client.messages.create(
+    async def _run_all(
+        self,
+        versions: list[PromptVersion],
+        test_cases: list[EvalCase],
+    ) -> list[EvalResult]:
+        tasks = [
+            self._run_single(version, test_case)
+            for version in versions
+            for test_case in test_cases
+        ]
+        return await asyncio.gather(*tasks)
+
+    async def _run_single(self, version: PromptVersion, test_case: EvalCase) -> EvalResult:
+        message = await self.async_client.messages.create(
             model=version.model,
             max_tokens=version.max_tokens,
             system=version.system_prompt,
