@@ -16,5 +16,8 @@ test-chat:
 test-eval:
 	source venv/bin/activate && python -m pytest claude_prompt_eval/tests/ -v
 
+coder:
+	source venv/bin/activate && python code-editing-agent/agent.py
+
 setup:
 	python3 -m venv venv && source venv/bin/activate && pip install anthropic python-dotenv pytest
