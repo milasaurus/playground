@@ -10,10 +10,18 @@ A collection of projects exploring agentic workflows and prompt engineering with
 | `claude_prompt_eval/` | Evaluate system prompts by auto-generating test cases and grading with Claude-as-judge |
 | `code_editing_agent/` | Terminal-based agent that gives Claude tools to read, list, and edit files |
 
-## Setup
+## Getting Started
 
 ```bash
+git clone https://github.com/milasaurus/playground.git
+cd playground
 make setup
+```
+
+Create a `.env` file in the project root with your Anthropic API key:
+
+```bash
+ANTHROPIC_API_KEY=your-api-key-here
 ```
 
 ## Commands
