@@ -1,7 +1,3 @@
-# Mila Wilson
-
-10+ years building ML systems at Twitter, Block, Spotify. Currently going deep on agentic workflows.
-
 ## How I build
 
 Plan mode → sub-agents per task → Ralph loop for long-running work → Conductor for parallel workstreams.
