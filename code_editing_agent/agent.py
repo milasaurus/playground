@@ -61,7 +61,8 @@ class Agent:
         for new user input when Claude responds with text only.
         """
         conversation = []
-        print("Chat with Claude (use 'ctrl-c' to quit)")
+        print("\033[93m🤖 Coding Agent Ready. Ask me anything about your codebase!\033[0m")
+        print("(use 'ctrl-c' to quit)\n")
 
         read_user_input = True
         while True:
@@ -75,6 +76,8 @@ class Agent:
             message = self._run_inference(conversation)
             conversation.append({"role": "assistant", "content": message.content})
 
+            # Claude may return multiple tool_use blocks in a single response.
+            # Execute all of them and send results back together.
             tool_results = []
             for block in message.content:
                 if block.type == "text":
@@ -83,7 +86,9 @@ class Agent:
                     result = self._execute_tool(block.id, block.name, block.input)
                     tool_results.append(result)
 
-            if not tool_results:
+            # stop_reason == "tool_use" means Claude wants to call more tools;
+            # "end_turn" means it's done and we should prompt the user again.
+            if message.stop_reason != "tool_use":
                 read_user_input = True
                 continue
 

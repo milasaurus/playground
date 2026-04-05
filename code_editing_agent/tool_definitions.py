@@ -16,6 +16,8 @@ import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from anthropic.types import ToolParam
+
 
 class Tool(ABC):
     """Base class for all agent tools.
@@ -27,7 +29,7 @@ class Tool(ABC):
     description: str
     input_schema: dict
 
-    def to_api_dict(self) -> dict:
+    def to_api_dict(self) -> ToolParam:
         """Return the dict the Anthropic API expects for tool definitions."""
         return {
             "name": self.name,

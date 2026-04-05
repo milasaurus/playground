@@ -1,6 +1,6 @@
 # Code-Editing Agent
 
-A terminal-based AI agent built with the Anthropic Python SDK. Chat with Claude in the terminal while giving it tools to read, list, and edit files in your working directory.
+This project wires up Claude with file system tools, grep, glob, and shell access to create an interactive agent that can read, search, and reason about your codebase. Claude decides which tools to call, chains them together, and maintains conversational memory across your session.
 
 ## Usage
 
@@ -26,4 +26,7 @@ make coder
 
 ## Adding a tool
 
-Subclass `Tool` in `tool_definitions.py`, implement `run(params) -> str`, and add an instance to the tools list in `agent.py` `main()`.
+1. Create a new class in `tool_definitions.py` that extends `Tool`
+2. Define `name`, `description`, and `input_schema` as class attributes
+3. Implement the `run(params) -> str` method with your tool's logic
+4. Add an instance to the tools list in `agent.py` `main()`
