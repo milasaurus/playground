@@ -7,7 +7,7 @@ A collection of projects exploring agentic workflows and prompt engineering with
 | Directory | Description |
 |-----------|-------------|
 | `claude_conversation_engine/` | Multi-turn chat with Claude using streaming, history tracking, and token usage reporting |
-| `claude_prompt_eval/` | Evaluate system prompts by auto-generating test cases and grading with Claude-as-judge |
+| `claude_prompt_eval/` | Evaluate system prompts by auto-generating test cases and prompt grading with Claude |
 | `code-editing-agent/` | Terminal-based agent that gives Claude tools to read, list, and edit files |
 
 ## Setup
