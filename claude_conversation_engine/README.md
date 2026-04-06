@@ -12,9 +12,13 @@ The Claude Conversation Engine handles the plumbing of talking to Claude — mes
 
 Maintains full conversation history across turns. Every message you send includes the full context of what came before, so Claude always knows what's been discussed.
 
+### Streaming Responses
+
+Responses stream in real-time, printing character-by-character as Claude generates them using `client.messages.stream()`.
+
 ### System Prompts
 
-Control Claude's behavior per product or per message:
+Control Claude's behavior per conversation or per message:
 
 ```python
 # Set a personality for the whole conversation
@@ -55,7 +59,6 @@ A ready-to-use terminal chat loop with quit support. Type messages, get response
 1. Clone the repository and set up your environment:
 
 ```bash
-cd claude
 make setup
 ```
 
@@ -84,10 +87,10 @@ make chat
 
 ```python
 from client import client
-from core_services.claude_conversation_engine.api.history import HistoryHandler
-from core_services.claude_conversation_engine.api.messages import MessageHandler
-from core_services.claude_conversation_engine.usage_tracking.tracker import UsageTracker
-from core_services.claude_conversation_engine.services.send_message import run_chat
+from claude_conversation_engine.api.history import HistoryHandler
+from claude_conversation_engine.api.messages import MessageHandler
+from claude_conversation_engine.usage_tracking.tracker import UsageTracker
+from claude_conversation_engine.services.send_message import run_chat
 
 history = HistoryHandler()
 tracker = UsageTracker()
@@ -102,26 +105,58 @@ print(response)
 print(tracker.report())
 ```
 
-## Project Structure
+## Architecture
 
 ```
-claude/
-  client.py                                  # Shared Anthropic client
-  core_services/
-    claude_conversation_engine/
-      api/
-        messages.py                          # MessageHandler — sends messages to Claude
-        history.py                           # HistoryHandler — tracks conversation state
-      services/
-        send_message.py                      # Interactive chat loop (run_chat)
-      usage_tracking/
-        tracker.py                           # Tracks token usage per turn
-      tests/                                 # 14 tests covering all of the above
-  Makefile                                   # make chat, make test, make setup
+claude_conversation_engine/
+  api/
+    messages.py                    # MessageHandler — sends messages to Claude via streaming
+    history.py                     # HistoryHandler — tracks conversation state
+  services/
+    send_message.py                # Interactive chat loop (run_chat)
+  usage_tracking/
+    tracker.py                     # Tracks token usage per turn
+  tests/                           # Tests covering all components
 ```
+
+### Component Dependencies
+
+```
+Client (Anthropic instance from client.py at repo root)
+  |
+  v
+MessageHandler
+  ├── HistoryHandler (stores conversation messages)
+  ├── UsageTracker (records token usage)
+  └── client.messages.stream() (Anthropic API)
+
+run_chat()
+  ├── MessageHandler.send()
+  └── UsageTracker.report()
+```
+
+### Key Classes
+
+| Class | File | Purpose |
+|-------|------|---------|
+| `HistoryHandler` | `api/history.py` | Manages conversation message list. Returns defensive copies. |
+| `MessageHandler` | `api/messages.py` | Wraps `client.messages.stream()`, manages multi-turn context, tracks tokens. |
+| `UsageTracker` | `usage_tracking/tracker.py` | Records per-turn token counts, generates formatted reports. |
+| `run_chat()` | `services/send_message.py` | Interactive terminal loop with configurable I/O for testing. |
+
+### Configuration
+
+| Setting | Default | Override |
+|---------|---------|----------|
+| Model | `claude-haiku-4-5-20251001` | `MessageHandler(model=...)` |
+| Max tokens | `1024` | `MessageHandler(max_tokens=...)` |
+| System prompt | Guidance-focused default | Constructor or per-message via `send(system_prompt=...)` |
 
 ## Testing
 
 ```bash
-make test
+make test-chat    # Run conversation engine tests only
+make test         # Run all tests across the repo
 ```
+
+14 tests covering history management, message handling, streaming, token tracking, system prompt overrides, and the interactive chat loop.

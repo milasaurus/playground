@@ -126,6 +126,16 @@ If yes, simplify.
 - Mock external API calls -- never hit the real Claude API in tests
 - Use constants for test values -- avoid hardcoded strings in assertions
 
+### README Maintenance
+
+Each project has its own README. After making changes to a project, read its README and update it to reflect the current state:
+
+- `claude_conversation_engine/README.md`
+- `claude_prompt_eval/README.md` (if it exists)
+- `code_editing_agent/README.md` (if it exists)
+
+Update READMEs when changes affect: architecture, public API, configuration, project structure, commands, or features. Don't update for internal refactors that don't change the external interface.
+
 ### Commit Guidelines
 
 - One logical change per commit
