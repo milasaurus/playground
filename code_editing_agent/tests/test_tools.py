@@ -1,15 +1,11 @@
 import json
 import os
+import subprocess
 import pytest
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from tool_definitions import ReadFileTool, ListFilesTool, EditFileTool
-
-
-read_file_tool = ReadFileTool()
-list_files_tool = ListFilesTool()
-edit_file_tool = EditFileTool()
+from tool_definitions import read_file_tool, list_files_tool, edit_file_tool, run_command_tool
 
 
 # ── ReadFileTool ─────────────────────────────────────────────────────────────
@@ -114,3 +110,32 @@ def test_edit_file_missing_file_with_old_str():
 def test_edit_file_rejects_empty_path():
     with pytest.raises(ValueError, match="invalid input"):
         edit_file_tool.run({"path": "", "old_str": "a", "new_str": "b"})
+
+
+# ── RunCommandTool ───────────────────────────────────────────────────────────
+
+
+
+def test_run_command_returns_stdout():
+    result = run_command_tool.run({"command": "echo hello"})
+    assert "hello" in result
+
+
+def test_run_command_returns_stderr():
+    result = run_command_tool.run({"command": "echo error >&2"})
+    assert "error" in result
+
+
+def test_run_command_returns_exit_code_on_failure():
+    result = run_command_tool.run({"command": "exit 1"})
+    assert "[exit code: 1]" in result
+
+
+def test_run_command_timeout():
+    with pytest.raises(subprocess.TimeoutExpired):
+        run_command_tool.run({"command": "sleep 10", "timeout": 1})
+
+
+def test_run_command_no_output():
+    result = run_command_tool.run({"command": "true"})
+    assert result == "(no output)"
