@@ -2,6 +2,7 @@
 
 setup:
 	python3 -m venv venv && source venv/bin/activate && pip install anthropic python-dotenv pytest
+	$(MAKE) -C property_management_agent setup
 
 # ── Run ──────────────────────────────────────────────────────────────────────
 
