@@ -16,6 +16,19 @@ Maintains full conversation history across turns. Every message you send include
 
 Responses stream in real-time, printing character-by-character as Claude generates them using `client.messages.stream()`.
 
+### Extended Thinking
+
+Enable Claude's extended thinking to see its reasoning process before responding:
+
+```python
+handler = MessageHandler(client, history, tracker, thinking=True)
+
+# Custom thinking budget
+handler = MessageHandler(client, history, tracker, thinking=True, thinking_budget=2048)
+```
+
+When enabled, a `[Thinking...]` indicator displays while Claude reasons, then the response streams normally. Thinking content blocks are stored in conversation history for multi-turn coherence.
+
 ### System Prompts
 
 Control Claude's behavior per conversation or per message:
@@ -149,7 +162,9 @@ run_chat()
 | Setting | Default | Override |
 |---------|---------|----------|
 | Model | `claude-haiku-4-5-20251001` | `MessageHandler(model=...)` |
-| Max tokens | `1024` | `MessageHandler(max_tokens=...)` |
+| Max tokens | `4000` | `MessageHandler(max_tokens=...)` |
+| Thinking | `False` | `MessageHandler(thinking=True)` |
+| Thinking budget | `1024` | `MessageHandler(thinking_budget=...)` |
 | System prompt | Guidance-focused default | Constructor or per-message via `send(system_prompt=...)` |
 
 ## Testing
@@ -159,4 +174,4 @@ make test-chat    # Run conversation engine tests only
 make test         # Run all tests across the repo
 ```
 
-14 tests covering history management, message handling, streaming, token tracking, system prompt overrides, and the interactive chat loop.
+18 tests covering history management, message handling, streaming, token tracking, system prompt overrides, extended thinking, and the interactive chat loop.

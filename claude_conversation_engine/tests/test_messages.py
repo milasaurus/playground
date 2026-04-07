@@ -1,20 +1,24 @@
 from unittest.mock import MagicMock, patch
 from claude_conversation_engine.api.history import HistoryHandler, USER_ROLE, ASSISTANT_ROLE
-from claude_conversation_engine.api.messages import MessageHandler, DEFAULT_MODEL, DEFAULT_SYSTEM_PROMPT
+from claude_conversation_engine.api.messages import (
+    MessageHandler, DEFAULT_MODEL, DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_MAX_TOKENS, DEFAULT_THINKING_BUDGET,
+)
 from claude_conversation_engine.usage_tracking.tracker import UsageTracker
 
-DEFAULT_MAX_TOKENS = 1024
 CUSTOM_MODEL = "claude-haiku-4-5-20251001"
 CUSTOM_MAX_TOKENS = 512
 CUSTOM_SYSTEM_PROMPT = "You are a math tutor."
 
 
-def make_mock_client(text, input_tokens=10, output_tokens=5):
+def make_mock_client(text, input_tokens=10, output_tokens=5, content_blocks=None):
     mock_client = MagicMock()
     mock_stream = MagicMock()
     mock_stream.text_stream = list(text)
     mock_stream.get_final_message.return_value.usage.input_tokens = input_tokens
     mock_stream.get_final_message.return_value.usage.output_tokens = output_tokens
+    if content_blocks is not None:
+        mock_stream.get_final_message.return_value.content = content_blocks
     mock_client.messages.stream.return_value.__enter__ = MagicMock(return_value=mock_stream)
     mock_client.messages.stream.return_value.__exit__ = MagicMock(return_value=False)
     return mock_client
@@ -168,3 +172,123 @@ def test_send_with_system_prompt_override(mock_print):
         system=override_prompt,
         messages=[{"role": USER_ROLE, "content": content}],
     )
+
+
+@patch("builtins.print")
+def test_send_with_thinking_enabled(mock_print):
+    content = "Explain recursion"
+    expected = "Recursion is when a function calls itself."
+
+    thinking_block = MagicMock()
+    thinking_block.type = "thinking"
+    thinking_block.model_dump.return_value = {
+        "type": "thinking",
+        "thinking": "Let me think about this...",
+        "signature": "sig123",
+    }
+    text_block = MagicMock()
+    text_block.type = "text"
+    text_block.model_dump.return_value = {
+        "type": "text",
+        "text": expected,
+    }
+
+    mock_client = make_mock_client(
+        expected,
+        content_blocks=[thinking_block, text_block],
+    )
+
+    history = HistoryHandler()
+    tracker = UsageTracker()
+    handler = MessageHandler(mock_client, history, tracker, thinking=True)
+    result = handler.send(content)
+
+    assert result == expected
+    mock_client.messages.stream.assert_called_once_with(
+        model=DEFAULT_MODEL,
+        max_tokens=DEFAULT_MAX_TOKENS,
+        system=DEFAULT_SYSTEM_PROMPT,
+        messages=[{"role": USER_ROLE, "content": content}],
+        thinking={
+            "type": "enabled",
+            "budget_tokens": DEFAULT_THINKING_BUDGET,
+        },
+    )
+
+
+@patch("builtins.print")
+def test_thinking_stores_content_blocks_in_history(mock_print):
+    content = "Hello"
+    expected = "Hi there!"
+
+    thinking_block = MagicMock()
+    thinking_block.type = "thinking"
+    thinking_block.model_dump.return_value = {
+        "type": "thinking",
+        "thinking": "Simple greeting.",
+        "signature": "sig456",
+    }
+    text_block = MagicMock()
+    text_block.type = "text"
+    text_block.model_dump.return_value = {
+        "type": "text",
+        "text": expected,
+    }
+
+    mock_client = make_mock_client(
+        expected,
+        content_blocks=[thinking_block, text_block],
+    )
+
+    history = HistoryHandler()
+    tracker = UsageTracker()
+    handler = MessageHandler(mock_client, history, tracker, thinking=True)
+    handler.send(content)
+
+    messages = history.get_messages()
+    assert messages[0] == {"role": USER_ROLE, "content": content}
+    assert messages[1] == {
+        "role": ASSISTANT_ROLE,
+        "content": [
+            {"type": "thinking", "thinking": "Simple greeting.", "signature": "sig456"},
+            {"type": "text", "text": expected},
+        ],
+    }
+
+
+@patch("builtins.print")
+def test_thinking_with_custom_budget(mock_print):
+    content = "Hi"
+    expected = "Hello!"
+    custom_budget = 2048
+
+    mock_client = make_mock_client(expected, content_blocks=[])
+
+    history = HistoryHandler()
+    tracker = UsageTracker()
+    handler = MessageHandler(
+        mock_client, history, tracker,
+        thinking=True, thinking_budget=custom_budget,
+    )
+    handler.send(content)
+
+    call_kwargs = mock_client.messages.stream.call_args.kwargs
+    assert call_kwargs["thinking"] == {
+        "type": "enabled",
+        "budget_tokens": custom_budget,
+    }
+
+
+@patch("builtins.print")
+def test_thinking_disabled_by_default(mock_print):
+    content = "Hi"
+    expected = "Hello!"
+    mock_client = make_mock_client(expected)
+
+    history = HistoryHandler()
+    tracker = UsageTracker()
+    handler = MessageHandler(mock_client, history, tracker)
+    handler.send(content)
+
+    call_kwargs = mock_client.messages.stream.call_args.kwargs
+    assert "thinking" not in call_kwargs

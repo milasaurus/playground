@@ -8,7 +8,7 @@ class HistoryHandler:
     def __init__(self):
         self.conversation: list[dict] = []
 
-    def add(self, role: str, content: str):
+    def add(self, role: str, content):
         self.conversation.append({"role": role, "content": content})
 
     def get_messages(self) -> list[dict]:
