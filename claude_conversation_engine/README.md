@@ -137,6 +137,8 @@ claude_conversation_engine/
   api/
     messages.py                    # MessageHandler — sends messages to Claude via streaming
     history.py                     # HistoryHandler — tracks conversation state
+  helpers/
+    image_helper.py                # ImageHelper — image loading, encoding, and validation
   services/
     send_message.py                # Interactive chat loop (run_chat)
   usage_tracking/
@@ -165,6 +167,7 @@ run_chat()
 | Class | File | Purpose |
 |-------|------|---------|
 | `HistoryHandler` | `api/history.py` | Manages conversation message list. Returns defensive copies. |
+| `ImageHelper` | `helpers/image_helper.py` | Loads images from files/URLs, encodes to base64, validates size. |
 | `MessageHandler` | `api/messages.py` | Wraps `client.messages.stream()`, manages multi-turn context, tracks tokens. |
 | `UsageTracker` | `usage_tracking/tracker.py` | Records per-turn token counts, generates formatted reports. |
 | `run_chat()` | `services/send_message.py` | Interactive terminal loop with configurable I/O for testing. |

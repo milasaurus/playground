@@ -112,6 +112,7 @@ If yes, simplify.
 - Keep imports organized -- stdlib, third-party, local
 - Extract magic strings into constants
 - Use dependency injection -- pass dependencies into classes, don't import globals
+- Use named parameters for hardcoded/literal values in function calls (e.g. `make_client(text="response")`, `MessageHandler(client, history, tracker, thinking=True)`). Positional args are fine when passing variables whose names already convey meaning.
 
 ### Boundaries -- Never Modify
 

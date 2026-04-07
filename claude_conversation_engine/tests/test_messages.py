@@ -3,14 +3,19 @@ import pytest
 from unittest.mock import MagicMock, patch
 from claude_conversation_engine.api.history import HistoryHandler, USER_ROLE, ASSISTANT_ROLE
 from claude_conversation_engine.api.messages import (
-    MessageHandler, ImageHelper, DEFAULT_MODEL, DEFAULT_SYSTEM_PROMPT,
-    DEFAULT_MAX_TOKENS, DEFAULT_THINKING_BUDGET, MAX_IMAGE_SIZE_BYTES,
+    MessageHandler, DEFAULT_MODEL, DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_MAX_TOKENS, DEFAULT_THINKING_BUDGET,
 )
+from claude_conversation_engine.helpers.image_helper import ImageHelper, MAX_IMAGE_SIZE_BYTES
 from claude_conversation_engine.usage_tracking.tracker import UsageTracker
 
 CUSTOM_MODEL = "claude-haiku-4-5-20251001"
 CUSTOM_MAX_TOKENS = 512
 CUSTOM_SYSTEM_PROMPT = "You are a math tutor."
+
+
+def cached_system(prompt):
+    return [{"type": "text", "text": prompt, "cache_control": {"type": "ephemeral"}}]
 
 
 def make_mock_client(text, input_tokens=10, output_tokens=5, content_blocks=None):
@@ -132,7 +137,7 @@ def test_send_uses_default_system_prompt(mock_print):
     mock_client.messages.stream.assert_called_once_with(
         model=DEFAULT_MODEL,
         max_tokens=DEFAULT_MAX_TOKENS,
-        system=DEFAULT_SYSTEM_PROMPT,
+        system=cached_system(DEFAULT_SYSTEM_PROMPT),
         messages=[{"role": USER_ROLE, "content": content}],
     )
 
@@ -151,7 +156,7 @@ def test_send_with_custom_system_prompt_in_init(mock_print):
     mock_client.messages.stream.assert_called_once_with(
         model=DEFAULT_MODEL,
         max_tokens=DEFAULT_MAX_TOKENS,
-        system=CUSTOM_SYSTEM_PROMPT,
+        system=cached_system(CUSTOM_SYSTEM_PROMPT),
         messages=[{"role": USER_ROLE, "content": content}],
     )
 
@@ -171,7 +176,7 @@ def test_send_with_system_prompt_override(mock_print):
     mock_client.messages.stream.assert_called_once_with(
         model=DEFAULT_MODEL,
         max_tokens=DEFAULT_MAX_TOKENS,
-        system=override_prompt,
+        system=cached_system(override_prompt),
         messages=[{"role": USER_ROLE, "content": content}],
     )
 
@@ -209,7 +214,7 @@ def test_send_with_thinking_enabled(mock_print):
     mock_client.messages.stream.assert_called_once_with(
         model=DEFAULT_MODEL,
         max_tokens=DEFAULT_MAX_TOKENS,
-        system=DEFAULT_SYSTEM_PROMPT,
+        system=cached_system(DEFAULT_SYSTEM_PROMPT),
         messages=[{"role": USER_ROLE, "content": content}],
         thinking={
             "type": "enabled",
@@ -296,7 +301,7 @@ def test_thinking_disabled_by_default(mock_print):
     assert "thinking" not in call_kwargs
 
 
-@patch("claude_conversation_engine.api.messages.urllib.request.urlopen")
+@patch("claude_conversation_engine.helpers.image_helper.urllib.request.urlopen")
 @patch("builtins.print")
 def test_send_with_image_url_fetches_and_encodes(mock_print, mock_urlopen):
     content = "What's in this image?"
@@ -373,14 +378,14 @@ def test_send_without_image_stores_plain_string(mock_print):
 def test_image_exceeding_max_size_raises_error():
     oversized_b64 = "A" * (MAX_IMAGE_SIZE_BYTES * 2)
     image_data = {"media_type": "image/png", "data": oversized_b64}
-    mock_client = make_mock_client("response")
+    mock_client = make_mock_client(text="response")
 
     history = HistoryHandler()
     tracker = UsageTracker()
     handler = MessageHandler(mock_client, history, tracker)
 
     with pytest.raises(ValueError, match="exceeds maximum size of 5MB"):
-        handler.send("Describe this", image=image_data)
+        handler.send(content="Describe this", image=image_data)
 
 
 def test_image_under_max_size_is_accepted():
@@ -389,8 +394,8 @@ def test_image_under_max_size_is_accepted():
     ImageHelper.build_content_block(image_data)  # should not raise
 
 
-@patch("claude_conversation_engine.api.messages.os.path.isfile", return_value=True)
-@patch("claude_conversation_engine.api.messages.ImageHelper.load_from_file")
+@patch("claude_conversation_engine.helpers.image_helper.os.path.isfile", return_value=True)
+@patch("claude_conversation_engine.helpers.image_helper.ImageHelper.load_from_file")
 @patch("builtins.print")
 def test_send_with_local_file_path(mock_print, mock_load, mock_isfile):
     content = "What's in this photo?"
