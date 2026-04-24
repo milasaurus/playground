@@ -4,16 +4,16 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from agent_trace_debugger.trace import (
+from agent_trace_debugger.models import (
     NODE_DECISION,
     NODE_OBSERVATION,
     NODE_TOOL_CALL,
     NODE_USER_INPUT,
     Trace,
     TraceCost,
-    Tracer,
     load_trace,
 )
+from agent_trace_debugger.services.tracer import Tracer
 
 
 USER_Q = "What is the capital of France?"

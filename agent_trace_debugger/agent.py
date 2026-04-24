@@ -8,54 +8,29 @@ un-traced run; pass `InstrumentedClient` / `InstrumentedToolRunner` (via
 
 from typing import Any
 
-from .instrumentation import MaxTurnsExceeded
+from .services.agent_runner import MaxTurnsExceeded
 
 
 DEFAULT_MODEL      = "claude-sonnet-4-6"
 DEFAULT_MAX_TOKENS = 1024
 
 SYSTEM_PROMPT = (
-    "You are a concise research assistant. Only call `web_search` when you "
-    "are uncertain about a specific fact or the question requires up-to-date "
-    "information. For common knowledge, answer directly without calling "
-    "tools. Keep responses brief."
+    "You are a concise research assistant. Answer from your own knowledge "
+    "when possible. Call `web_search` when the question requires up-to-date "
+    "information (news, recent events, live data) or a specific fact you "
+    "genuinely do not know. When you use search results, cite the source URL "
+    "inline. Keep responses brief."
 )
 
+# Anthropic's server-side web search tool. The search runs on Anthropic's
+# infrastructure; results arrive in the same response as `server_tool_use` /
+# `web_search_tool_result` content blocks — no client-side implementation
+# needed, and `TOOL_IMPLS` stays empty.
 TOOL_DEFS = [
-    {
-        "name": "web_search",
-        "description": "Search the web for information on a topic.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "The search query."},
-            },
-            "required": ["query"],
-        },
-    },
+    {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
 ]
 
-
-def mock_web_search(query: str) -> str:
-    """Deterministic mock so the demo is reproducible offline.
-
-    TODO: swap for Claude's built-in web_search server tool. For now we test
-    against pre-canned questions (France, Japan, Everest) so runs stay offline
-    and deterministic.
-    """
-    q = query.lower()
-    if "france" in q and "capital" in q:
-        return "Paris is the capital of France. Population ~2.1M (city proper)."
-    if "capital" in q and "japan" in q:
-        return "Tokyo is the capital of Japan. Population ~13.9M."
-    if "tallest mountain" in q or "everest" in q:
-        return "Mount Everest, 8,848.86 m, on the Nepal-China border."
-    return f"No high-confidence results for: '{query}'."
-
-
-TOOL_IMPLS = {
-    "web_search": lambda i: mock_web_search(i["query"]),
-}
+TOOL_IMPLS: dict[str, Any] = {}
 
 
 class ResearchAgent:
