@@ -3,164 +3,130 @@ date: 2026-04-24
 topic: agent-trace-debugger-improvements
 ---
 
-# Agent Trace Debugger — Small Improvements for Abstraction, Signal, and Verification
+# Agent Trace Debugger — Small Improvements
 
-## Problem Frame
+## The problem
 
-The debugger today captures single-agent runs as a tree of decision / tool_call /
-observation nodes and renders them in a Textual TUI. That covers the original
-scope (multi-hop reasoning + context window pressure) but it doesn't yet produce
-data that helps answer three recurring agent-development questions:
+The debugger shows a single agent run as a tree. That's fine for the two
+things we built it for: multi-hop reasoning loops and context bloat. But
+three other questions keep coming up and the trace can't answer them:
 
-1. **Tool abstraction level.** Are the tools we give the agent at the right
-   level? Too low and it wastes calls on mechanical steps; too high and it
-   can't handle edge cases.
-2. **Dense signal from long trajectories.** When a run spans thousands of
-   decisions, how do we attribute outcomes back to specific reasoning steps and
-   bootstrap a judge we trust?
-3. **Agent self-verification.** Did the agent actually read the output of the
-   tests / typechecker / other verification tool before claiming success?
+1. **Are the tools at the right level?** Does the agent waste calls on
+   mechanical steps, or hit edge cases it can't handle?
+2. **What mattered in this run?** Thousands of decisions is too much to
+   eyeball. I need a way to mark the important ones.
+3. **Did the agent read the tool output, or just guess?** When it runs
+   tests and says "looks good," did it actually look?
 
-Scope for this brainstorm is three small, surgical additions to the existing
-debugger — one per problem. None are meant to fully solve their problem; each
-gives durable data we can act on.
+Three small additions, one per question. Ship order: **C → A → B**
+(novel piece first, then the piece I'll use every day, then the
+aggregation that only pays off on multi-tool agents).
 
-## Requirements
+## C. Verification flag + read-back check
 
-**B. Per-tool usage report (Tool abstraction)**
+**Problem:** agent runs tests, says "pass," moves on — without reading
+the output.
 
-- R1. After a run, compute per-tool aggregates over the trace's `tool_call`
-  and `observation` nodes: call count, duplicate-input count, error count,
-  average observation size (bytes or chars), average tool latency.
-- R2. Treat two calls as duplicates when the same tool name is called with
-  byte-identical `input` (after JSON canonicalization) within the same run.
-  Canonicalize with `json.dumps(input, sort_keys=True, separators=(',', ':'))`
-  so key-order differences don't defeat the equality check. Exact match is
-  enough for v1; fuzzy match is out of scope.
-- R3. Surface the report in both output modes: a new footer panel in the
-  TUI, and a block printed after the tree in `--print` mode.
-- R4. Subsume the "loop detection" bullet in
-  `agent_trace_debugger/plan.md:14` — duplicate-input count is the loop signal.
+**Fix, in two parts:**
 
-**A. Node annotation (Dense signal from long trajectories)**
+- **R10. Flag verification tools at registration.** Add an optional
+  `verification: bool` (default `False`) to
+  `agent_trace_debugger/services/tool_runner.py`. Simplest shape: the
+  dict accepts either a plain callable or `(callable, verification=True)`.
+  Pick whichever is cleanest. The flag lands on
+  `metadata.verification` for each `tool_call`. Client-side tools only
+  for v1 — no consumer for the server-side path yet.
 
-- R5. In the TUI, the selected node can be tagged as `good`, `wasted`, or
-  `pivotal` via dedicated keybindings. Tags are stored in
-  `TraceNode.metadata.tags` as a list of strings. Toggling a key that's
-  already applied removes it.
-- R6. The detail panel shows current tags for the selected node.
-- R7. Annotations persist: the TUI saves the annotated trace back to disk on
-  exit (or on an explicit save keybinding). Format is the existing trace JSON.
-- R8. The CLI supports loading a saved trace into the TUI without running an
-  agent, so annotations work on any previously-captured run (including from
-  other agents wired through `run_traced`).
-- R9. `main.py` auto-saves every fresh run's trace to disk under a predictable
-  path so annotations can be added later. Path convention chosen in planning.
+- **R11. Check if the output got read.** After the run, for each
+  `observation` node, set `metadata.output_referenced` to
+  `true` / `false` / `null`:
+  - Find the next `decision` or `response` that came after this
+    observation's turn (walk `observation → tool_call → decision`, then
+    look for the next sibling decision under the root).
+  - If the observation is under 8 words (`ok`, `(no results)`), return
+    `null` — too short to judge.
+  - If the next decision mentions the tool name or reuses an 8-word
+    chunk of the output, return `true`. Else `false`.
 
-**C. Verification category + read-back heuristic (Self-verification)**
+  Dumb on purpose. We iterate once we see real traces.
 
-- R10. Tool registration accepts an optional `category` per tool, one of
-  `verification`, `exploration`, or `mutation` (default: `exploration`).
-  The category is written into `metadata.category` on `tool_call` nodes.
-- R11. Post-run, for each `observation` node compute a boolean
-  `metadata.output_referenced` by checking whether any ≥20-token substring
-  of the observation appears in the next `decision` or `response` node
-  produced by the same agent turn. Paraphrase-level references will be
-  false negatives — this is accepted.
-- R12. The TUI surfaces both signals: category is shown as a badge on
-  `tool_call` nodes (colour *and* a single-letter label — `[V]`, `[E]`,
-  `[M]` — so the signal survives monochrome terminals and colour-blind
-  users); `output_referenced=false` on a `verification` observation is
-  rendered with a non-colour warning marker (e.g. `!!` or a Unicode warn
-  glyph).
-- R13. The report from R1 gains a per-category breakdown so
-  "verification calls with unread outputs" is a single, scannable number.
+- **R12. Show it in the TUI.** `[V]` badge on verification tool_calls,
+  `!!` next to verification observations with `output_referenced=false`.
 
-## Success Criteria
+## A. Node tagging
 
-- After running an agent once, I can answer these three questions from the
-  TUI alone, without reading the raw trace JSON:
-  1. Which tool is the top candidate for changing abstraction level, and why
-     (duplicate-input count, oversized observations, or high error rate)?
-  2. Which nodes in this run were pivotal vs wasted (because I tagged them),
-     and do those tags survive if I reopen the saved trace tomorrow?
-  3. Did the agent read the verification tool's output before its next
-     decision, or not?
-- The `ResearchAgent` run keeps working unchanged. Existing tests pass.
-  No tool needs to declare a category for the old behaviour to hold.
-- A trace loaded from disk renders identically to a fresh run, plus whatever
-  annotations are stored in it.
+**Problem:** long runs have thousands of steps. No way to mark which
+ones mattered.
 
-## Scope Boundaries
+- **R5. Tag nodes with `g` / `w` / `p`.** Good / wasted / pivotal.
+  Stored in `TraceNode.metadata.tags` as a list. Independent — a node
+  can be both pivotal and wasted. Press again to remove. Register as
+  named Textual `Binding`s so they show up in the footer automatically.
 
-- **Not fixing non-determinism.** The debugger still shows *what* the model
-  did, not *why* it chose to do it. Unchanged from the current README.
-- **Not a full eval harness.** R5–R9 create raw material for judges; actually
-  training or running a judge is a separate project.
-- **Not reshaping the monorepo for agents.** R10–R13 detect symptoms of
-  weak self-verification. Making `make test` fast, commands unambiguous,
-  and failures loud is a different piece of work.
-- **Not fuzzy duplicate detection.** R2 is exact-match only.
-- **Not streaming capture.** Writes still happen end-of-run. Real-time
-  capture remains on the "not here yet" list in the README.
-- **Not multi-agent correlation.** Still one trace per run.
+- **R6. Show tags in the detail panel.** When empty, render
+  `tags: (press g/w/p to tag)` so the feature is discoverable.
 
-## Key Decisions
+- **R7. Save.** `s` saves and stays open. `q` saves and quits. Path:
+  `traces/<trace_id>.json` relative to CWD for a fresh run; overwrite
+  the source file when opened via `--load`. Add `traces/` to
+  `.gitignore`. On save failure, show the error in the detail panel
+  and don't quit.
 
-- **Three commits, ordered B → A → C.** Lowest risk first (pure aggregation,
-  no schema change), then TUI interaction + persistence, then the mildly
-  invasive tool-registration change. Each commit ships independently.
-- **Annotations live on `TraceNode.metadata`, not a new top-level field.**
-  Keeps the JSON schema stable and lets future tag types land without
-  migration.
-- **Read-back heuristic is lossy on purpose.** A substring check is cheap,
-  requires no model call, and its false-negative mode (paraphrase) is
-  explicit. A smarter check would buy marginal accuracy at real cost.
-- **Category default is `exploration`.** Existing `ResearchAgent` tools
-  don't need to change to keep working; only agents that care about
-  verification pay the cost of categorising.
+- **R8. Load a saved trace.** `--load PATH` opens the TUI on a saved
+  trace without running an agent. Makes the positional `question`
+  argument optional. Bad path or malformed JSON: print the error and
+  exit before the TUI starts.
 
-## Dependencies / Assumptions
+## B. Per-tool report
 
-- The current trace JSON is already annotation-friendly: `TraceNode.metadata`
-  is a free-form dict and round-trips through `Trace.to_dict` /
-  `Trace.from_dict`. Verified in `agent_trace_debugger/models.py`.
-- `Tracer.save` and `load_trace` already exist (in
-  `agent_trace_debugger/services/tracer.py` and
-  `agent_trace_debugger/models.py` respectively) but are not wired into
-  `main.py` — R8 and R9 activate them.
-- Tool registration is currently `tool_impls: dict[str, Callable]` in
-  `agent_trace_debugger/services/tool_runner.py`. R10 extends the contract;
-  backwards compatibility is required (plain callables keep working).
-- Plugged-in agents going through `run_traced` benefit from all three
-  features automatically, since instrumentation is centralised.
+**Problem:** can't tell at a glance which tool is the problem.
 
-## Outstanding Questions
+- **R1. Aggregate per tool.** Call count, total duplicate calls, max
+  consecutive duplicates, error count, avg output size, avg latency.
 
-### Resolve Before Planning
+- **R2. What counts as a duplicate.** Same tool name + same input.
+  Canonicalize input with
+  `json.dumps(input, sort_keys=True, separators=(',', ':'))` so key
+  order doesn't break the match.
 
-(none — all product decisions are made)
+- **R3. Show it.** A new pane below the tree in the TUI, and a block
+  after the tree in `--print` mode. Aggregation lives in a pure
+  function so both renderers share it.
 
-### Deferred to Planning
+- **R4.** Replaces the "loop detection" bullet in
+  `agent_trace_debugger/improvements.md`. Loops show up as high
+  max-consecutive-duplicates.
 
-- [Affects R3][Technical] Where in the TUI layout does the per-tool report
-  go — a new bottom panel, an overlay toggled by a key, or appended to the
-  detail panel when the root node is selected?
-- [Affects R7][Technical] Save-on-exit vs explicit save keybinding vs both.
-  Trade-off is data loss on crash vs surprise writes to the trace file.
-- [Affects R9][Technical] Save path convention for auto-saved traces —
-  `traces/<trace_id>.json` at repo root, or under a user cache dir? Affects
-  `.gitignore`.
-- [Affects R11][Technical] Token counting for the 20-token threshold —
-  reuse tiktoken-style counting or a cheap whitespace split? Accuracy here
-  is not critical; cost and deps are.
-- [Affects R10][Needs research] Is there a cleanest way to pass categories
-  alongside impls — a second dict `tool_categories: dict[str, str]`, or a
-  tagged value type, or a small `ToolSpec` dataclass — given the existing
-  `ToolImpls` alias? Planning should pick the one that requires the fewest
-  call-site changes in `agent_trace_debugger/agent.py` and any future
-  pluggable agents.
+## What success looks like
 
-## Next Steps
+From the TUI, after a run:
 
--> `/ce:plan` for structured implementation planning
+1. I can tag nodes and the tags survive when I `--load` the trace
+   tomorrow.
+2. Verification tool_calls are visible at a glance, and I can spot the
+   ones the agent didn't read.
+3. I can see which tool has the most consecutive duplicates, errors, or
+   oversized outputs.
+
+## What we're not building
+
+- Fixing non-determinism. The trace shows *what*, not *why*.
+- A real eval harness. Tags are just raw material.
+- Tool-name auto-lift for verification. Authors flag explicitly.
+- Fuzzy duplicate detection, streaming capture, multi-agent correlation.
+
+## Existing hooks we'll use
+
+- `TraceNode.metadata` round-trips through `Trace.to_dict` /
+  `Trace.from_dict` (`agent_trace_debugger/models.py`). Tags serialize
+  for free.
+- `Tracer.save` and `load_trace` already exist
+  (`agent_trace_debugger/services/tracer.py`, `models.py`) but aren't
+  wired into `main.py`. R7 and R8 wire them in.
+
+## Open questions for planning
+
+- Exact layout of the tool-report pane — below the tree, overlay, or
+  toggled by a key? Fit it without crowding the detail panel.
+- Exact shape of the verification-flag registration API — tuple, small
+  dataclass, or something else. Pick the smallest call-site diff.
