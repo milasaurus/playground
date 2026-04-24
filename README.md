@@ -1,6 +1,6 @@
 # Playground
 
-A collection of projects exploring agentic workflows and prompt engineering with the Anthropic Python SDK.
+A collection of projects exploring agentic workflows with the Anthropic Python SDK.
 
 ## Projects
 
