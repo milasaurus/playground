@@ -14,6 +14,8 @@ the kind of tool you wish existed the first time an agent did something weird in
    navigation, per-node detail panel, token totals in the header. Pass
    `--print` for a colour-coded tree on stdout (pipes / non-TTY).
 
+<img width="1083" height="554" alt="image" src="https://github.com/user-attachments/assets/73042e81-7ad1-481f-94b4-7fedccaea9cc" />
+
 ## Trace shape
 
 ```
