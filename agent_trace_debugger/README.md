@@ -4,6 +4,31 @@ An auto-instrumented Claude agent + terminal TUI that captures every decision,
 tool call, and observation into a structured trace. Built for agent observability: 
 the kind of tool you wish existed the first time an agent did something weird in production.
 
+## The problem this solves
+
+Single-agent loops go wrong in ways that API logs and dashboards don't show
+you. The two that actually matter in practice:
+
+**Multi-hop reasoning gone sideways.** Loops on the same tool, drift off the
+original question, tool results that were never really read, early commits to
+the wrong answer. You can't debug any of these from a single API call — you
+need the whole decision → tool_call → observation chain in order, which is
+exactly what the trace gives you.
+
+**Context window pressure.** Tool observations stack up, prior turns stack up,
+cached prefixes stack up. The trace's running token total per turn shows you
+*when* the growth accelerated and *which* observation was the culprit, so you
+can spot trouble before you hit the ceiling instead of after.
+
+If your agent did something weird, the answer is almost always in one of
+those two places. This tool puts both on the same screen.
+
+**What it closes:** the inspection gap — every decision, tool call, and
+observation is a node in a readable tree with cost and latency attached.
+Reading an agent run should feel more like reading a stack trace than a chat
+log. **What it doesn't:** the non-determinism itself. The trace shows you
+*what* the model did, not *why* it chose to do it.
+
 ## What it does
 
 1. Runs a small **research agent** (Claude + mock `web_search` tool).
