@@ -143,13 +143,8 @@ trace = run_traced(MyAgent, raw_client, tool_impls, "your question")
 `run_traced` wraps the client and tool dispatcher with instrumented versions.
 The agent writes plain Claude code — the trace is a side effect.
 
-## Design notes (for future-me / interviewers)
+## Design notes (for future-me)
 
-- **Zero tracing vocabulary in agent code.** `InstrumentedClient` wraps
-  `client.messages.create` and emits decision/response nodes; `InstrumentedToolRunner`
-  wraps tool dispatch and emits tool_call/observation nodes. The agent only sees
-  a normal Claude client and a tool runner — swap them for plain versions and
-  it runs un-traced without any code change.
 - **Tree via `parent_id`, not nested structs.** Keeps JSON flat, diff-friendly,
   and streamable — append-only writes would work unchanged for real-time
   capture.
