@@ -15,10 +15,10 @@ DEFAULT_MODEL      = "claude-sonnet-4-6"
 DEFAULT_MAX_TOKENS = 1024
 
 SYSTEM_PROMPT = (
-    "You are a concise research assistant. When a question needs external "
-    "facts, call `web_search`. If you already know the answer or have enough "
-    "from prior searches, answer directly without calling tools. Keep "
-    "responses brief."
+    "You are a concise research assistant. Only call `web_search` when you "
+    "are uncertain about a specific fact or the question requires up-to-date "
+    "information. For common knowledge, answer directly without calling "
+    "tools. Keep responses brief."
 )
 
 TOOL_DEFS = [
