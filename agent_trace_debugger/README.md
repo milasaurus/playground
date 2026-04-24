@@ -45,6 +45,8 @@ log. **What it doesn't:** the non-determinism itself. The trace shows you
 > that triggers a search is a real paid API call. Running the default demo
 > costs a few cents, not free.
 
+<img width="1497" height="553" alt="image" src="https://github.com/user-attachments/assets/5c03bb9d-006f-481b-a834-e3200f6371c7" />
+
 ## Trace shape
 
 ```
