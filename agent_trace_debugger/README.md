@@ -39,7 +39,7 @@ log. **What it doesn't:** the non-determinism itself. The trace shows you
    navigation, per-node detail panel, token totals in the header. Pass
    `--print` for a colour-coded tree on stdout (pipes / non-TTY).
 
-<img width="1083" height="554" alt="image" src="https://github.com/user-attachments/assets/73042e81-7ad1-481f-94b4-7fedccaea9cc" />
+<img width="1497" height="553" alt="image" src="https://github.com/user-attachments/assets/5c03bb9d-006f-481b-a834-e3200f6371c7" />
 
 ## Trace shape
 
