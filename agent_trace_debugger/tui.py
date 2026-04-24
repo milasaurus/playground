@@ -10,7 +10,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Footer, Static, Tree
 
-from .trace import Trace, TraceNode
+from .models import Trace, TraceNode
 
 
 # Color per node type — keep in sync with trace.NODE_* constants.

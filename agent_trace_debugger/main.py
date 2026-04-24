@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from client import client
 from agent_trace_debugger.agent import TOOL_IMPLS, ResearchAgent
-from agent_trace_debugger.instrumentation import run_traced
+from agent_trace_debugger.services.agent_runner import run_traced
 from agent_trace_debugger.tui import print_trace, run_tui
 
 
