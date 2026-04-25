@@ -16,10 +16,22 @@ prompt-verbose:
 	source venv/bin/activate && python -m claude_prompt_eval.services.evaluation --verbose
 
 coder:
-	source venv/bin/activate && python code_editing_agent/agent.py
+	source venv/bin/activate && python -m code_editing_agent.agent
+
+coder-traced:
+	source venv/bin/activate && python -m code_editing_agent.traced_main
 
 debugger:
 	source venv/bin/activate && python -m agent_trace_debugger.main $${Q:+"$$Q"}
+
+# Open a saved trace in the TUI. Defaults to the most recent file in
+# traces/. Override with TRACE=path/to/trace.json.
+tui:
+	@if [ -z "$$TRACE" ] && ! ls traces/*.json >/dev/null 2>&1; then \
+		echo "no traces yet — run 'make coder-traced' first or pass TRACE=path"; \
+		exit 1; \
+	fi
+	source venv/bin/activate && python -m agent_trace_debugger.main --load $${TRACE:-$$(ls -t traces/*.json | head -1)}
 
 # ── Property Management Agent (uses uv, not the root venv) ──────────────────
 
