@@ -8,15 +8,11 @@ plain text, then prompts the user again.
 """
 
 import json
-import os
-import sys
 from typing import Callable
 
 import anthropic
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from client import client
-from tool_definitions import (
+from .tool_definitions import (
     Tool, ReadFileTool, ListFilesTool, EditFileTool, RunCommandTool,
     truncate_tool_output,
 )
@@ -148,6 +144,9 @@ class Agent:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
+    # Import here to avoid circular dependency and keep module importable without API key
+    from client import client
+
     def get_user_message() -> tuple[str, bool]:
         try:
             return input(), True
@@ -160,4 +159,7 @@ def main():
 
 
 if __name__ == "__main__":
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     main()

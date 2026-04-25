@@ -21,7 +21,9 @@ import sys
 import time
 from typing import Any
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Add repo root to path when running as script
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from client import client
 from agent_trace_debugger.models import NODE_OBSERVATION, NODE_TOOL_CALL
@@ -29,9 +31,9 @@ from agent_trace_debugger.services.client import InstrumentedClient
 from agent_trace_debugger.services.tracer import TracingContext
 from agent_trace_debugger.tui import print_trace
 
-from agent import Agent
-import tool_definitions as td
-from tool_definitions import (
+from .agent import Agent
+from . import tool_definitions as td
+from .tool_definitions import (
     Tool, ReadFileTool, ListFilesTool, EditFileTool, RunCommandTool,
 )
 

@@ -4,12 +4,7 @@ Drives a fake user-input function and a mock streaming client through the
 existing `Agent` to simulate a session, then asserts the trace structure.
 """
 
-import os
-import sys
 from unittest.mock import MagicMock
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from agent_trace_debugger.models import (
     NODE_DECISION,
@@ -21,9 +16,9 @@ from agent_trace_debugger.models import (
 from agent_trace_debugger.services.client import InstrumentedClient
 from agent_trace_debugger.services.tracer import TracingContext
 
-from agent import Agent
-from tool_definitions import Tool
-from traced_main import _TracingTool
+from code_editing_agent.agent import Agent
+from code_editing_agent.tool_definitions import Tool
+from code_editing_agent.traced_main import _TracingTool
 
 
 # ── fixtures ─────────────────────────────────────────────────────────────────

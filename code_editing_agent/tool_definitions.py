@@ -94,7 +94,7 @@ class ReadFileTool(Tool):
             return f.read()
 
 
-read_file_tool = ReadFileTool()
+
 
 
 # ── list_files ───────────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ class ListFilesTool(Tool):
         return json.dumps(result)
 
 
-list_files_tool = ListFilesTool()
+
 
 
 # ── edit_file ────────────────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ class EditFileTool(Tool):
         return "OK"
 
 
-edit_file_tool = EditFileTool()
+
 
 
 # ── run_command ──────────────────────────────────────────────────────────────
@@ -254,6 +254,3 @@ class RunCommandTool(Tool):
         if result.returncode != 0:
             output += f"\n[exit code: {result.returncode}]"
         return output or "(no output)"
-
-
-run_command_tool = RunCommandTool()
