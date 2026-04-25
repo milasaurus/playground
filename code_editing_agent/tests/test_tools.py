@@ -5,7 +5,10 @@ import pytest
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from tool_definitions import read_file_tool, list_files_tool, edit_file_tool, run_command_tool
+from tool_definitions import (
+    read_file_tool, list_files_tool, edit_file_tool, run_command_tool,
+    truncate_tool_output, MAX_OUTPUT_CHARS, HEAD_CHARS, TAIL_CHARS,
+)
 
 
 # ── ReadFileTool ─────────────────────────────────────────────────────────────
@@ -139,3 +142,50 @@ def test_run_command_timeout():
 def test_run_command_no_output():
     result = run_command_tool.run({"command": "true"})
     assert result == "(no output)"
+
+
+# ── truncate_tool_output ─────────────────────────────────────────────────────
+
+def test_truncate_passes_short_through():
+    text = "hello world"
+    assert truncate_tool_output(text) == text
+
+
+def test_truncate_passes_empty_through():
+    assert truncate_tool_output("") == ""
+
+
+def test_truncate_passes_exact_threshold_through():
+    text = "x" * MAX_OUTPUT_CHARS
+    assert truncate_tool_output(text) == text
+
+
+def test_truncate_cuts_just_over_threshold():
+    text = "x" * (MAX_OUTPUT_CHARS + 1)
+    result = truncate_tool_output(text)
+    assert result != text
+    assert len(result) < len(text)
+
+
+def test_truncate_keeps_head_and_tail():
+    head = "H" * HEAD_CHARS
+    middle = "M" * 5000
+    tail = "T" * TAIL_CHARS
+    text = head + middle + tail
+    result = truncate_tool_output(text)
+    assert result.startswith(head)
+    assert result.endswith(tail)
+
+
+def test_truncate_marker_mentions_omitted_count():
+    text = "x" * (MAX_OUTPUT_CHARS + 5000)
+    result = truncate_tool_output(text)
+    omitted = len(text) - HEAD_CHARS - TAIL_CHARS
+    assert str(omitted) in result
+    assert "omitted" in result
+
+
+def test_truncate_marker_suggests_recovery():
+    text = "x" * (MAX_OUTPUT_CHARS + 1000)
+    result = truncate_tool_output(text)
+    assert any(hint in result for hint in ("grep", "head", "offset"))

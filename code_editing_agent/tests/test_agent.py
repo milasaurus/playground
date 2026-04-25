@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from agent import Agent
-from tool_definitions import Tool
+from tool_definitions import Tool, MAX_OUTPUT_CHARS
 
 
 TOOL_ID = "tool_123"
@@ -36,6 +36,19 @@ class FailingTool(Tool):
 
     def run(self, params: dict) -> str:
         raise RuntimeError("boom")
+
+
+class LongOutputTool(Tool):
+    def __init__(self, payload: str):
+        super().__init__(
+            name="long",
+            description="returns a long string",
+            input_schema={"type": "object", "properties": {}},
+        )
+        self._payload = payload
+
+    def run(self, params: dict) -> str:
+        return self._payload
 
 
 echo_tool = EchoTool()
@@ -91,6 +104,18 @@ class TestExecuteTool:
         result = agent._execute_tool(TOOL_ID, "fail", {})
         assert result["is_error"] is True
         assert "boom" in result["content"]
+
+    def test_long_tool_output_is_truncated(self):
+        long_tool = LongOutputTool("x" * (MAX_OUTPUT_CHARS + 5000))
+        agent = Agent(self.client, lambda: ("", False), [long_tool])
+        result = agent._execute_tool(TOOL_ID, "long", {})
+        assert len(result["content"]) < MAX_OUTPUT_CHARS + 5000
+        assert "omitted" in result["content"]
+        assert "is_error" not in result
+
+    def test_short_tool_output_is_unchanged(self):
+        result = self.agent._execute_tool(TOOL_ID, TOOL_NAME, {})
+        assert result["content"] == TOOL_RESPONSE
 
 
 # ── run loop ─────────────────────────────────────────────────────────────────
