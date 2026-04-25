@@ -9,7 +9,7 @@ nodes hang off the right parent.
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 from uuid import uuid4
 
 from ..models import NODE_USER_INPUT, Trace, TraceCost, TraceNode

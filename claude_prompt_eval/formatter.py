@@ -29,16 +29,16 @@ def format_result(result: EvalResult, score: ScoreResult) -> list[str]:
         f"     Score: {score_bar(score.score)}",
         f"     Tokens: {result.input_tokens} in / {result.output_tokens} out",
         "",
-        f"     Response:",
+        "     Response:",
     ]
     for line in result.response.split("\n"):
         lines.append(f"       {line}")
     lines.extend([
         "",
-        f"     What worked:",
+        "     What worked:",
         f"       {score.strengths}",
         "",
-        f"     What didn't:",
+        "     What didn't:",
         f"       {score.weaknesses}",
         "",
         f"  {DIVIDER}",

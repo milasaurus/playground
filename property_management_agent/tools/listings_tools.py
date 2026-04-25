@@ -105,7 +105,7 @@ class SearchListingsByDescriptionTool(Tool):
         )
 
     def run(self, params: dict) -> str:
-        return json.dumps([asdict(l) for l in self.listings.search_by_description(params["search_term"])])
+        return json.dumps([asdict(listing) for listing in self.listings.search_by_description(params["search_term"])])
 
 
 # The main tool for customer inquiries like "2BR under $3000". All params
@@ -138,7 +138,7 @@ class SearchListingsByRentRangeTool(Tool):
             max_rent=params.get("max_rent"),
             filters=filters,
         )
-        return json.dumps([asdict(l) for l in results])
+        return json.dumps([asdict(listing) for listing in results])
 
 
 # Returns every listing. Used when the model needs a full overview or
@@ -154,4 +154,4 @@ class ListAllListingsTool(Tool):
         )
 
     def run(self, params: dict) -> str:
-        return json.dumps([asdict(l) for l in self.listings.list_all_listings()])
+        return json.dumps([asdict(listing) for listing in self.listings.list_all_listings()])

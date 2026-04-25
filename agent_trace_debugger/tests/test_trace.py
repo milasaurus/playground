@@ -13,7 +13,7 @@ from agent_trace_debugger.models import (
     TraceCost,
     load_trace,
 )
-from agent_trace_debugger.services.tracer import Tracer
+from agent_trace_debugger.services.tracer import Tracer, TracingContext
 
 
 USER_Q = "What is the capital of France?"
@@ -78,8 +78,6 @@ def test_trace_to_dict_is_json_serializable():
 
 
 # ── TracingContext: interactive session helpers ──────────────────────────────
-
-from agent_trace_debugger.services.tracer import TracingContext
 
 
 def test_start_sets_current_user_input_to_root():

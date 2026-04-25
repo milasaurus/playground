@@ -101,7 +101,7 @@ def test_email_apartment_inquiry(managers):
     recorded_message = inbox_messages[0]
     assert recorded_message.contact_email == sender, "Email sender should match"
     assert recorded_message.subject == subject, "Email subject should match"
-    assert recorded_message.is_incoming == True, "Email should be incoming"
+    assert recorded_message.is_incoming is True, "Email should be incoming"
 
     assert "123 Oak Street" in response, "Should include 123 Oak Street"
     assert "456 Maple Ave" in response, "Should include 456 Maple Ave"
@@ -116,7 +116,7 @@ def test_email_schedule_viewing(managers):
     inbox, listings, calendar = managers
 
     # Setup: Create a listing
-    listing = listings.create_listing(
+    listings.create_listing(
         description="Beautiful 3BR house with garden",
         address="123 Oak Street",
         monthly_rent=3200,
@@ -162,7 +162,7 @@ def test_email_cancel_showing(managers):
     tomorrow_4pm = tomorrow.replace(hour=16, minute=0, second=0, microsecond=0)
     tomorrow_5pm = tomorrow.replace(hour=17, minute=0, second=0, microsecond=0)
 
-    event = calendar.create_event(
+    calendar.create_event(
         name="Showing at 456 Maple Ave for john@example.com",
         start_timestamp=tomorrow_4pm,
         end_timestamp=tomorrow_5pm,
@@ -202,7 +202,7 @@ def test_query_delete_listing(managers):
     inbox, listings, calendar = managers
 
     # Setup: Create a listing to delete
-    listing = listings.create_listing(
+    listings.create_listing(
         description="Old listing to be removed",
         address="123 Oak Street",
         monthly_rent=2500,
@@ -221,7 +221,7 @@ def test_query_delete_listing(managers):
     assert len(all_listings) == 0, "Listing should have been deleted"
 
     # Double check - search for specific address
-    oak_street = [l for l in all_listings if "123 Oak Street" in l.address]
+    oak_street = [listing for listing in all_listings if "123 Oak Street" in listing.address]
     assert len(oak_street) == 0, "No listings at 123 Oak Street should remain"
 
 
@@ -238,7 +238,7 @@ def test_query_reschedule_appointment(managers):
     tomorrow_4pm = tomorrow.replace(hour=16, minute=0, second=0, microsecond=0)
     tomorrow_5pm = tomorrow.replace(hour=17, minute=0, second=0, microsecond=0)
 
-    event = calendar.create_event(
+    calendar.create_event(
         name="Client meeting",
         start_timestamp=tomorrow_4pm,
         end_timestamp=tomorrow_5pm,
