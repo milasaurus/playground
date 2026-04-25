@@ -8,7 +8,7 @@ plain text, then prompts the user again.
 """
 
 import json
-from typing import Callable
+from typing import Any, Callable, NotRequired, TypedDict
 
 import anthropic
 
@@ -22,6 +22,18 @@ from .tool_definitions import (
 
 DEFAULT_MODEL = "claude-opus-4-5"
 DEFAULT_MAX_TOKENS = 4096
+
+
+class ToolResult(TypedDict):
+    """Shape of the `tool_result` content block sent back to Claude.
+
+    Mirrors the Anthropic API's tool_result schema. `is_error` is omitted
+    on success and set to True when the tool raised or wasn't found.
+    """
+    type:        str
+    tool_use_id: str
+    content:     str
+    is_error:    NotRequired[bool]
 
 
 class Agent:
@@ -43,21 +55,21 @@ class Agent:
         tools: list[Tool],
         model: str = DEFAULT_MODEL,
         max_tokens: int = DEFAULT_MAX_TOKENS,
-    ):
+    ) -> None:
         self.client          = client
         self.get_user_message = get_user_message
         self.tools           = tools
         self.model           = model
         self.max_tokens      = max_tokens
 
-    def run(self):
+    def run(self) -> None:
         """Main loop. Alternates between user input and Claude responses.
 
         When Claude responds with tool_use blocks, the agent executes each tool
         and feeds results back without prompting the user. The loop only asks
         for new user input when Claude responds with text only.
         """
-        conversation = []
+        conversation: list[dict[str, Any]] = []
         print("\033[93m🤖 Coding Agent Ready. Ask me anything about your codebase!\033[0m")
         print("(use 'ctrl-c' to quit)\n")
 
@@ -74,7 +86,7 @@ class Agent:
             conversation.append({"role": "assistant", "content": message.content})
 
             # Execute any tool_use blocks and send results back together.
-            tool_results = []
+            tool_results: list[ToolResult] = []
             for block in message.content:
                 if block.type == "tool_use":
                     result = self._execute_tool(block.id, block.name, block.input)
@@ -89,7 +101,7 @@ class Agent:
             read_user_input = False
             conversation.append({"role": "user", "content": tool_results})
 
-    def _run_inference(self, conversation: list) -> anthropic.types.Message:
+    def _run_inference(self, conversation: list[dict[str, Any]]) -> anthropic.types.Message:
         """Stream the response, printing text tokens as they arrive."""
         tool_dicts = [t.to_api_dict() for t in self.tools]
         if tool_dicts:
@@ -104,7 +116,7 @@ class Agent:
         ) as stream:
             for text in stream.text_stream:
                 if not printed_prefix:
-                    print(f"\033[93mClaude\033[0m: ", end="", flush=True)
+                    print("\033[93mClaude\033[0m: ", end="", flush=True)
                     printed_prefix = True
                 print(text, end="", flush=True)
 
@@ -113,7 +125,7 @@ class Agent:
 
             return stream.get_final_message()
 
-    def _execute_tool(self, tool_id: str, name: str, input: dict) -> dict:
+    def _execute_tool(self, tool_id: str, name: str, input: dict[str, Any]) -> ToolResult:
         """Look up a tool by name, run it, and return a tool_result dict.
 
         Errors are caught and returned as error tool_results so Claude can
@@ -143,7 +155,7 @@ class Agent:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
-def main():
+def main() -> None:
     # Import here to avoid circular dependency and keep module importable without API key
     from client import client
 
@@ -153,7 +165,7 @@ def main():
         except (EOFError, KeyboardInterrupt):
             return "", False
     # add new tools here
-    tools = [ReadFileTool(), ListFilesTool(), EditFileTool(), RunCommandTool()]
+    tools: list[Tool] = [ReadFileTool(), ListFilesTool(), EditFileTool(), RunCommandTool()]
     agent = Agent(client, get_user_message, tools)
     agent.run()
 

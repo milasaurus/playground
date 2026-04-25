@@ -19,7 +19,7 @@ import json
 import os
 import sys
 import time
-from typing import Any
+from typing import Any, Callable
 
 # Add repo root to path when running as script
 if __name__ == "__main__":
@@ -46,7 +46,7 @@ class _TracingTool(Tool):
     trace observation matches what the model actually sees.
     """
 
-    def __init__(self, inner: Tool, ctx: TracingContext):
+    def __init__(self, inner: Tool, ctx: TracingContext) -> None:
         super().__init__(
             name         = inner.name,
             description  = inner.description,
@@ -55,7 +55,7 @@ class _TracingTool(Tool):
         self._inner = inner
         self._ctx   = ctx
 
-    def run(self, params: dict) -> str:
+    def run(self, params: dict[str, Any]) -> str:
         tool_call = self._ctx.tracer.add_node(
             type      = NODE_TOOL_CALL,
             name      = self.name,
@@ -96,7 +96,7 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def make_get_user_message(ctx: TracingContext):
+def make_get_user_message(ctx: TracingContext) -> Callable[[], tuple[str, bool]]:
     """Read a prompt from stdin and record it as a new user_input node."""
     def get_user_message() -> tuple[str, bool]:
         try:
