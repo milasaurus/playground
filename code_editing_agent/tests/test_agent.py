@@ -1,12 +1,9 @@
-import os
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from agent import Agent
-from tool_definitions import Tool, MAX_OUTPUT_CHARS
+from code_editing_agent.agent import Agent
+from code_editing_agent.tool_definitions import Tool, MAX_OUTPUT_CHARS
 
 
 TOOL_ID = "tool_123"

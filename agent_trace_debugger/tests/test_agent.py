@@ -221,3 +221,56 @@ def test_latency_recorded_on_decision_and_observation():
     assert by_type[NODE_OBSERVATION].duration_ms >= 0
     assert by_type[NODE_USER_INPUT].duration_ms is None
     assert by_type[NODE_TOOL_CALL].duration_ms is None
+
+
+# ── streamed-call instrumentation + multi-prompt sessions ────────────────────
+
+from agent_trace_debugger.services.client import InstrumentedClient
+from agent_trace_debugger.services.tracer import TracingContext
+
+
+def _make_stream_cm(final_msg):
+    """Mock context manager that mimics anthropic.messages.stream(...)."""
+    cm = MagicMock()
+    cm.text_stream = iter([])
+    cm.get_final_message.return_value = final_msg
+    cm.__enter__ = lambda self: cm
+    cm.__exit__  = lambda self, *args: None
+    return cm
+
+
+def test_instrumented_client_records_decision_for_streamed_calls():
+    """The streaming wrapper emits the same decision node as `.create()`."""
+    final_msg  = message([text_block("done.")], stop_reason="end_turn")
+    raw_client = MagicMock()
+    raw_client.messages.stream.return_value = _make_stream_cm(final_msg)
+
+    ctx    = TracingContext.start("hi")
+    client = InstrumentedClient(raw_client, ctx)
+
+    with client.messages.stream() as stream:
+        list(stream.text_stream)
+        msg = stream.get_final_message()
+
+    assert msg is final_msg
+    types = [n.type for n in ctx.tracer.trace.nodes]
+    assert types == [NODE_USER_INPUT, NODE_RESPONSE]
+    assert ctx.tracer.trace.nodes[1].parent_id == ctx.current_user_input_id
+
+
+def test_decision_attaches_to_most_recent_user_input_in_session():
+    """In an interactive session, decisions hang off the latest user_input,
+    not the placeholder root."""
+    raw_client = MagicMock()
+    raw_client.messages.create.return_value = message(
+        [text_block("ok")], stop_reason="end_turn"
+    )
+
+    ctx          = TracingContext.start_session()
+    client       = InstrumentedClient(raw_client, ctx)
+    first_prompt = ctx.start_new_user_input("first thing")
+    client.messages.create()
+
+    response = next(n for n in ctx.tracer.trace.nodes if n.type == NODE_RESPONSE)
+    assert response.parent_id == first_prompt.id
+    assert response.parent_id != ctx.root.id
