@@ -14,6 +14,7 @@ import os
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
 from anthropic.types import ToolParam
 
@@ -47,7 +48,7 @@ class Tool(ABC):
     input_schema in their __init__.
     """
 
-    def __init__(self, name: str, description: str, input_schema: dict):
+    def __init__(self, name: str, description: str, input_schema: dict[str, Any]) -> None:
         self.name = name
         self.description = description
         self.input_schema = input_schema
@@ -61,14 +62,14 @@ class Tool(ABC):
         }
 
     @abstractmethod
-    def run(self, params: dict) -> str:
+    def run(self, params: dict[str, Any]) -> str:
         """Execute the tool and return a string result."""
 
 
 # ── read_file ────────────────────────────────────────────────────────────────
 
 class ReadFileTool(Tool):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="read_file",
             description=(
@@ -88,7 +89,7 @@ class ReadFileTool(Tool):
             },
         )
 
-    def run(self, params: dict) -> str:
+    def run(self, params: dict[str, Any]) -> str:
         path = params.get("path", "")
         with open(path, "r") as f:
             return f.read()
@@ -103,7 +104,7 @@ SKIP_DIRS = {".git", "node_modules", "venv", "__pycache__", ".venv"}
 
 
 class ListFilesTool(Tool):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="list_files",
             description=(
@@ -125,9 +126,9 @@ class ListFilesTool(Tool):
             },
         )
 
-    def run(self, params: dict) -> str:
+    def run(self, params: dict[str, Any]) -> str:
         dir_path = params.get("path", ".") or "."
-        result = []
+        result: list[str] = []
         for entry in sorted(Path(dir_path).rglob("*")):
             if any(part in SKIP_DIRS for part in entry.parts):
                 continue
@@ -151,7 +152,7 @@ def _create_new_file(file_path: str, content: str) -> str:
 
 
 class EditFileTool(Tool):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="edit_file",
             description=(
@@ -171,7 +172,7 @@ class EditFileTool(Tool):
             },
         )
 
-    def run(self, params: dict) -> str:
+    def run(self, params: dict[str, Any]) -> str:
         path    = params.get("path", "")
         old_str = params.get("old_str", "")
         new_str = params.get("new_str", "")
@@ -210,7 +211,7 @@ DEFAULT_TIMEOUT_SECONDS = 30
 
 
 class RunCommandTool(Tool):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             name="run_command",
             description=(
@@ -234,7 +235,7 @@ class RunCommandTool(Tool):
             },
         )
 
-    def run(self, params: dict) -> str:
+    def run(self, params: dict[str, Any]) -> str:
         command = params.get("command", "")
         timeout = params.get("timeout", DEFAULT_TIMEOUT_SECONDS)
 

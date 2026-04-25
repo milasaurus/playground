@@ -1,6 +1,4 @@
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from code_editing_agent.agent import Agent
 from code_editing_agent.tool_definitions import Tool, MAX_OUTPUT_CHARS

@@ -13,7 +13,9 @@ from agent_trace_debugger.models import (
     NODE_USER_INPUT,
 )
 from agent_trace_debugger.services.agent_runner import run_traced
+from agent_trace_debugger.services.client import InstrumentedClient
 from agent_trace_debugger.services.tool_runner import ToolRunner
+from agent_trace_debugger.services.tracer import TracingContext
 
 
 MODEL = "mock-model"
@@ -224,9 +226,6 @@ def test_latency_recorded_on_decision_and_observation():
 
 
 # ── streamed-call instrumentation + multi-prompt sessions ────────────────────
-
-from agent_trace_debugger.services.client import InstrumentedClient
-from agent_trace_debugger.services.tracer import TracingContext
 
 
 def _make_stream_cm(final_msg):

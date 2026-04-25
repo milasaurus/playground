@@ -6,8 +6,6 @@ All tests mock the Anthropic client so no API calls are made."""
 from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
 
-import pytest
-
 from agent import Agent
 from tools.base import Tool
 

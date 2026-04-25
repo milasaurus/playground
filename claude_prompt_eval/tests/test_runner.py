@@ -1,5 +1,4 @@
-import asyncio
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 from claude_prompt_eval.models import (
     PromptVersion, EvalCase, USER_ROLE, DEFAULT_MODEL, DEFAULT_MAX_TOKENS
 )
