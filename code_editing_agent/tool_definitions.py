@@ -20,7 +20,7 @@ from anthropic.types import ToolParam
 
 # ── output truncation ────────────────────────────────────────────────────────
 
-# Cap tool output to keep one fat call from blowing the context budget.
+# Cap tool output to keep one huge call from blowing the context budget.
 # Above MAX_OUTPUT_CHARS, keep the head + tail and replace the middle with
 # a marker that tells the agent how to fetch what was cut.
 MAX_OUTPUT_CHARS = 4000

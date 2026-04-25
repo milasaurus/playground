@@ -188,4 +188,49 @@ def test_truncate_marker_mentions_omitted_count():
 def test_truncate_marker_suggests_recovery():
     text = "x" * (MAX_OUTPUT_CHARS + 1000)
     result = truncate_tool_output(text)
-    assert any(hint in result for hint in ("grep", "head", "offset"))
+    assert any(hint in result for hint in ("grep", "head", "tail"))
+
+
+# ── truncate_tool_output: cost / accuracy guards ─────────────────────────────
+# These tests defend the cost/accuracy contract — that truncation actually
+# saves meaningful context (otherwise it's not worth the marker noise) and
+# that what we keep at the boundaries is preserved exactly (no off-by-one
+# drops of useful info next to the cut).
+
+def test_truncate_substantially_reduces_large_inputs():
+    """For inputs much larger than the threshold, output is a tiny fraction
+    of the original — proving the wrapper is paying for itself in tokens."""
+    huge = "x" * 100_000  # ~25x the threshold
+    result = truncate_tool_output(huge)
+    assert len(result) < len(huge) * 0.05  # saved at least 95% of original size
+
+
+def test_truncate_marker_overhead_is_small_relative_to_savings():
+    """The marker is tiny compared to what it stands in for. Otherwise the
+    cure is as expensive as the disease."""
+    huge = "x" * 100_000
+    result = truncate_tool_output(huge)
+    marker_overhead = len(result) - HEAD_CHARS - TAIL_CHARS
+    omitted = len(huge) - HEAD_CHARS - TAIL_CHARS
+    assert marker_overhead < omitted * 0.01  # marker is <1% of what it replaces
+
+
+def test_truncate_preserves_head_and_tail_bytes_exactly():
+    """No off-by-one at the boundaries. Use a varied pattern so any drift
+    would be visible — `xxx...` would mask a one-char shift."""
+    text = "".join(chr(65 + (i % 26)) for i in range(MAX_OUTPUT_CHARS + 5000))
+    result = truncate_tool_output(text)
+    assert result[:HEAD_CHARS] == text[:HEAD_CHARS]
+    assert result[-TAIL_CHARS:] == text[-TAIL_CHARS:]
+
+
+def test_truncate_output_is_bounded_regardless_of_input_size():
+    """Output stays near HEAD + TAIL + marker_overhead no matter how big
+    the input gets. Linear-in-input output growth would mean we're not
+    actually capping anything."""
+    BOUND = HEAD_CHARS + TAIL_CHARS + 200  # 200 chars allowance for the marker
+    for size in (10_000, 100_000, 1_000_000):
+        result = truncate_tool_output("x" * size)
+        assert len(result) <= BOUND, (
+            f"size={size} produced {len(result)} chars, exceeds bound {BOUND}"
+        )
