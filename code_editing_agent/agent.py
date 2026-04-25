@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from client import client
 from tool_definitions import (
     Tool, ReadFileTool, ListFilesTool, EditFileTool, RunCommandTool,
+    truncate_tool_output,
 )
 
 
@@ -133,13 +134,13 @@ class Agent:
 
         print(f"\033[92mtool\033[0m: {name}({json.dumps(input)})")
         try:
-            response = tool_def.run(input)
+            response = truncate_tool_output(tool_def.run(input))
             return {"type": "tool_result", "tool_use_id": tool_id, "content": response}
         except Exception as e:
             return {
                 "type":        "tool_result",
                 "tool_use_id": tool_id,
-                "content":     str(e),
+                "content":     truncate_tool_output(str(e)),
                 "is_error":    True,
             }
 

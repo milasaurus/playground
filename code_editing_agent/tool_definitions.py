@@ -18,6 +18,28 @@ from pathlib import Path
 from anthropic.types import ToolParam
 
 
+# ── output truncation ────────────────────────────────────────────────────────
+
+# Cap tool output to keep one huge call from blowing the context budget.
+# Above MAX_OUTPUT_CHARS, keep the head + tail and replace the middle with
+# a marker that tells the agent how to fetch what was cut.
+MAX_OUTPUT_CHARS = 4000
+HEAD_CHARS       = 2000
+TAIL_CHARS       = 1000
+
+
+def truncate_tool_output(text: str) -> str:
+    """Cap large tool output to head + marker + tail."""
+    if len(text) <= MAX_OUTPUT_CHARS:
+        return text
+    omitted = len(text) - HEAD_CHARS - TAIL_CHARS
+    marker = (
+        f"\n[... {omitted} chars omitted; re-run with a narrower query "
+        f"(e.g. grep, head, tail) to see more ...]\n"
+    )
+    return text[:HEAD_CHARS] + marker + text[-TAIL_CHARS:]
+
+
 class Tool(ABC):
     """Base class for tools that Claude can invoke during a conversation.
 
