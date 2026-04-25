@@ -62,7 +62,7 @@ def run_traced(
             type      = NODE_RESPONSE,
             name      = "claude",
             content   = f"(stopped: {e})",
-            parent_id = ctx.root.id,
+            parent_id = ctx.current_user_input_id,
         )
 
     return ctx.finish()

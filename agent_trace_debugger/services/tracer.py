@@ -80,18 +80,44 @@ class Tracer:
 class TracingContext:
     """Request-scoped tracer state.
 
-    Tracks the root user_input and the most recently recorded decision so that
-    tool_call nodes can hang off the correct parent.
+    Tracks three handles into the trace:
+    - `root` — the trace's root user_input node.
+    - `current_user_input_id` — the most recent user_input. Decisions hang
+      off this so multi-prompt sessions render cleanly under the right
+      branch. For single-shot runs (`start(question)`) it equals `root.id`,
+      so the existing behaviour is unchanged.
+    - `current_decision_id` — the most recent decision. tool_call nodes
+      hang off this.
     """
-    tracer:              Tracer
-    root:                TraceNode
-    current_decision_id: Optional[str] = None
+    tracer:                Tracer
+    root:                  TraceNode
+    current_decision_id:   Optional[str] = None
+    current_user_input_id: Optional[str] = None
 
     @classmethod
     def start(cls, question: str) -> "TracingContext":
         tracer = Tracer(question)
         root   = tracer.add_node(NODE_USER_INPUT, "user", question)
-        return cls(tracer=tracer, root=root)
+        return cls(tracer=tracer, root=root, current_user_input_id=root.id)
+
+    @classmethod
+    def start_session(cls, placeholder: str = "(interactive session)") -> "TracingContext":
+        """Like `start` but for sessions where prompts arrive over time.
+
+        Creates a placeholder root user_input so the trace has a top-level
+        anchor. Add real prompts with `start_new_user_input(content)` as
+        they arrive — each becomes a child of the placeholder root, and
+        decisions attach to the most recent prompt.
+        """
+        tracer = Tracer(placeholder)
+        root   = tracer.add_node(NODE_USER_INPUT, "session", placeholder)
+        return cls(tracer=tracer, root=root, current_user_input_id=root.id)
+
+    def start_new_user_input(self, content: str) -> TraceNode:
+        """Record a new user prompt and make it the parent for subsequent decisions."""
+        node = self.tracer.add_node(NODE_USER_INPUT, "user", content, parent_id=self.root.id)
+        self.current_user_input_id = node.id
+        return node
 
     def finish(self) -> Trace:
         return self.tracer.end()

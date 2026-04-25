@@ -75,3 +75,30 @@ def test_trace_to_dict_is_json_serializable():
     trace = t.end()
     # Should not raise.
     json.dumps(trace.to_dict())
+
+
+# ── TracingContext: interactive session helpers ──────────────────────────────
+
+from agent_trace_debugger.services.tracer import TracingContext
+
+
+def test_start_sets_current_user_input_to_root():
+    ctx = TracingContext.start("hi")
+    assert ctx.current_user_input_id == ctx.root.id
+
+
+def test_start_session_uses_placeholder_root():
+    ctx = TracingContext.start_session()
+    assert ctx.root.type == NODE_USER_INPUT
+    assert ctx.root.content == "(interactive session)"
+    assert ctx.current_user_input_id == ctx.root.id
+
+
+def test_start_new_user_input_adds_child_and_updates_current():
+    ctx = TracingContext.start_session()
+    first  = ctx.start_new_user_input("read agent.py")
+    second = ctx.start_new_user_input("now refactor")
+
+    assert first.parent_id  == ctx.root.id
+    assert second.parent_id == ctx.root.id
+    assert ctx.current_user_input_id == second.id  # tracks the most recent

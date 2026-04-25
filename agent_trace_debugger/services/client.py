@@ -24,7 +24,9 @@ from .tracer import TracingContext
 
 
 class _InstrumentedMessages:
-    """Wraps `client.messages`. Records a decision or response node per create()."""
+    """Wraps `client.messages`. Records a decision/response node per call,
+    whether the agent uses `.create(...)` or the streaming `.stream(...)`.
+    """
 
     def __init__(self, messages: Any, ctx: TracingContext):
         self._messages = messages
@@ -34,27 +36,45 @@ class _InstrumentedMessages:
         started = time.perf_counter()
         msg     = self._messages.create(**kwargs)
         elapsed = (time.perf_counter() - started) * 1000
+        _record_decision_node(self._ctx, msg, elapsed)
+        return msg
 
-        cost = TraceCost(
-            input_tokens  = msg.usage.input_tokens,
-            output_tokens = msg.usage.output_tokens,
-            model         = msg.model,
-        )
-        text      = "\n".join(b.text for b in msg.content if b.type == "text").strip()
-        is_final  = msg.stop_reason != "tool_use"
-        node_type = NODE_RESPONSE if is_final else NODE_DECISION
+    def stream(self, **kwargs: Any) -> "_InstrumentedStream":
+        return _InstrumentedStream(self._messages.stream(**kwargs), self._ctx)
 
-        decision = self._ctx.tracer.add_node(
-            type        = node_type,
-            name        = "claude",
-            content     = text or "(no text)",
-            reasoning   = f"stop_reason={msg.stop_reason}",
-            cost        = cost,
-            duration_ms = elapsed,
-            parent_id   = self._ctx.root.id,
-        )
-        self._ctx.current_decision_id = decision.id
-        _record_server_tool_blocks(self._ctx, msg.content, decision.id)
+
+class _InstrumentedStream:
+    """Wraps `messages.stream(...)` so the final message records a decision.
+
+    Mirrors the bits of the Anthropic stream API the existing agents use:
+    the context-manager protocol, the `text_stream` iterator, and
+    `get_final_message()`. The decision node is emitted when
+    `get_final_message()` is called, so streamed and non-streamed runs
+    produce the same trace shape.
+    """
+
+    def __init__(self, inner_cm: Any, ctx: TracingContext):
+        self._cm      = inner_cm
+        self._ctx     = ctx
+        self._inner   = None
+        self._started = None
+
+    def __enter__(self):
+        self._inner   = self._cm.__enter__()
+        self._started = time.perf_counter()
+        return self
+
+    def __exit__(self, *exc):
+        return self._cm.__exit__(*exc)
+
+    @property
+    def text_stream(self):
+        return self._inner.text_stream
+
+    def get_final_message(self):
+        msg     = self._inner.get_final_message()
+        elapsed = (time.perf_counter() - self._started) * 1000
+        _record_decision_node(self._ctx, msg, elapsed)
         return msg
 
 
@@ -64,6 +84,29 @@ class InstrumentedClient:
     def __init__(self, client: anthropic.Anthropic, ctx: TracingContext):
         self._client  = client
         self.messages = _InstrumentedMessages(client.messages, ctx)
+
+
+def _record_decision_node(ctx: TracingContext, msg: Any, elapsed_ms: float) -> None:
+    cost = TraceCost(
+        input_tokens  = msg.usage.input_tokens,
+        output_tokens = msg.usage.output_tokens,
+        model         = msg.model,
+    )
+    text      = "\n".join(b.text for b in msg.content if b.type == "text").strip()
+    is_final  = msg.stop_reason != "tool_use"
+    node_type = NODE_RESPONSE if is_final else NODE_DECISION
+
+    decision = ctx.tracer.add_node(
+        type        = node_type,
+        name        = "claude",
+        content     = text or "(no text)",
+        reasoning   = f"stop_reason={msg.stop_reason}",
+        cost        = cost,
+        duration_ms = elapsed_ms,
+        parent_id   = ctx.current_user_input_id,
+    )
+    ctx.current_decision_id = decision.id
+    _record_server_tool_blocks(ctx, msg.content, decision.id)
 
 
 def _block_type(block: Any) -> Optional[str]:
