@@ -44,6 +44,25 @@ Standalone single-file agent (`agent.py`) with its own CLAUDE.md. Not connected 
 ### Shared
 `client.py` at the repo root creates a shared `Anthropic` client (used by conversation engine and prompt eval, but **not** by code_editing_agent which creates its own).
 
+`observability.py` at the repo root provides shared Langfuse tracing helpers (`setup_langfuse`, `flush`, `observe_if_active`, `session_context`, `record_span_input`). Each project opts in from its own entry point — see "Observability" below.
+
+## Observability
+
+Projects opt into Langfuse tracing via the shared helpers in `observability.py`. The integration is optional — if `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` aren't set, the helpers are no-ops and projects run untraced.
+
+Standard wiring pattern:
+
+- `setup_langfuse()` early in `main()`, **before** the shared Anthropic client is imported (OTEL patches the SDK module, so any client built afterwards is auto-traced).
+- `flush()` before process exit.
+- `@observe_if_active(name=...)` on top-level methods (session loops, tool dispatch, pipeline stages).
+- `session_context(session_id, tags=[...])` at the top of any multi-turn flow; generate `session_id` with `uuid.uuid4()`.
+- `record_span_input({...})` inside `@observe_if_active` methods to set the span's input explicitly — otherwise all function args (including `self`) leak in.
+- **Don't manually instrument LLM calls.** The OTEL Anthropic instrumentor captures `client.messages.*` automatically.
+
+Reference implementation: `code_editing_agent/agent.py`. Counter-example (deliberately untraced): `code_editing_agent/traced_main.py`, which uses the local `agent_trace_debugger` TUI tracer instead.
+
+For deeper guidance on what to capture (session_id, user_id, tags, scores, masking PII) consult the installed `langfuse` skill — don't duplicate it here.
+
 ## Code Change Philosophy
 
 ### Keep Changes Small and Focused

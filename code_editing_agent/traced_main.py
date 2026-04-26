@@ -114,6 +114,11 @@ def main() -> None:
     if args.no_cap:
         td.MAX_OUTPUT_CHARS = 10**9
 
+    # Note: traced_main intentionally does NOT call setup_langfuse(). The
+    # local agent_trace_debugger tracer is the observability surface for
+    # this entry point. Langfuse stays inactive even if env vars are set
+    # — see observability.observe_if_active for the gating.
+
     ctx                 = TracingContext.start_session()
     instrumented_client = InstrumentedClient(client, ctx)
     raw_tools           = [ReadFileTool(), ListFilesTool(), EditFileTool(), RunCommandTool()]
