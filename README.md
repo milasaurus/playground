@@ -37,3 +37,48 @@ make property-agent        # Run the property management agent
 make debugger Q="..."      # Run the agent trace debugger on a question
 make test                  # Run all tests
 ```
+
+## Observability and Tracing
+
+Two complementary observability surfaces are available for projects in this repo. They serve different purposes and can run independently or together.
+
+### Local trace debugger (`agent_trace_debugger/`)
+
+A self-contained tracer plus Textual TUI for **local debugging**. Captures decisions, tool calls, and observations as a tree of nodes, writes them to a JSON file per session, and renders them interactively in the terminal. Best when you want to step through a single agent run, inspect token-level cost, or compare prompts side by side without leaving the machine.
+
+Used today by:
+- `make coder-traced` — runs the code-editing agent under tracing and saves to `traces/<id>.json`.
+- `make debugger Q="..."` — answers a single question and renders the trace inline.
+
+No external service or credentials required — it's all local files plus a terminal UI.
+
+### Langfuse (cloud observability)
+
+Cloud-side tracing via [Langfuse](https://langfuse.com). Every Anthropic API call is captured as a generation with model name and token usage; multi-step flows get nested spans; sessions group multi-turn conversations. Best when you want **dashboards, filtering across many sessions, cost analytics, or shared traces with a team**.
+
+Wiring lives in `observability.py` at the repo root and is shared by every project. Tracing is **opt-in** — if env vars are not set, projects run untraced and the helpers are no-ops.
+
+To enable for any project:
+
+1. Get keys from your Langfuse project: Settings → API Keys.
+2. Add to `.env`:
+   ```bash
+   LANGFUSE_PUBLIC_KEY=pk-lf-...
+   LANGFUSE_SECRET_KEY=sk-lf-...
+   LANGFUSE_HOST=https://cloud.langfuse.com           # or https://us.cloud.langfuse.com
+   ```
+3. The project's entry point must call `setup_langfuse()` before constructing the Anthropic client, and `flush()` before exit. See `CLAUDE.md` "Observability" for the standard pattern.
+
+Reference implementation: `code_editing_agent/agent.py` (`make coder` is Langfuse-traced when keys are set). Once enabled, traces appear in your Langfuse UI — see [Langfuse docs](https://langfuse.com/docs) for navigation.
+
+### When to use which
+
+| Need | Use |
+|---|---|
+| Step through a single run interactively | Local trace debugger |
+| Compare two prompt versions on one question | Local trace debugger |
+| Shared dashboard across many sessions | Langfuse |
+| Cost / latency analytics over time | Langfuse |
+| Filter traces by user, session, or tag | Langfuse |
+| Quick local debugging with no external deps | Local trace debugger |
+| Both at once on a single run | Wire both into the entry point |

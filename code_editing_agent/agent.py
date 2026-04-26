@@ -8,10 +8,12 @@ plain text, then prompts the user again.
 """
 
 import json
+import uuid
 from typing import Any, Callable, NotRequired, TypedDict
 
 import anthropic
 
+from observability import observe_if_active, record_span_input, session_context
 from .tool_definitions import (
     Tool, ReadFileTool, ListFilesTool, EditFileTool, RunCommandTool,
     truncate_tool_output,
@@ -20,7 +22,7 @@ from .tool_definitions import (
 
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
-DEFAULT_MODEL = "claude-opus-4-5"
+DEFAULT_MODEL = "claude-sonnet-4-6"
 DEFAULT_MAX_TOKENS = 4096
 
 
@@ -61,7 +63,9 @@ class Agent:
         self.tools           = tools
         self.model           = model
         self.max_tokens      = max_tokens
+        self.session_id      = str(uuid.uuid4())
 
+    @observe_if_active("agent-session")
     def run(self) -> None:
         """Main loop. Alternates between user input and Claude responses.
 
@@ -69,6 +73,10 @@ class Agent:
         and feeds results back without prompting the user. The loop only asks
         for new user input when Claude responds with text only.
         """
+        with session_context(self.session_id, tags=["code-editing-agent"]):
+            self._run_loop()
+
+    def _run_loop(self) -> None:
         conversation: list[dict[str, Any]] = []
         print("\033[93m🤖 Coding Agent Ready. Ask me anything about your codebase!\033[0m")
         print("(use 'ctrl-c' to quit)\n")
@@ -125,12 +133,14 @@ class Agent:
 
             return stream.get_final_message()
 
+    @observe_if_active("execute-tool")
     def _execute_tool(self, tool_id: str, name: str, input: dict[str, Any]) -> ToolResult:
         """Look up a tool by name, run it, and return a tool_result dict.
 
         Errors are caught and returned as error tool_results so Claude can
         see what went wrong and retry.
         """
+        record_span_input({"name": name, "params": input})
         tool_def = next((t for t in self.tools if t.name == name), None)
         if tool_def is None:
             return {
@@ -156,6 +166,12 @@ class Agent:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> None:
+    # Set up Langfuse tracing BEFORE importing the shared Anthropic client —
+    # OTEL patches the SDK module, so a client built afterwards is auto-traced.
+    # No-op when LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY aren't set.
+    from observability import setup_langfuse, flush
+    setup_langfuse()
+
     # Import here to avoid circular dependency and keep module importable without API key
     from client import client
 
@@ -167,7 +183,10 @@ def main() -> None:
     # add new tools here
     tools: list[Tool] = [ReadFileTool(), ListFilesTool(), EditFileTool(), RunCommandTool()]
     agent = Agent(client, get_user_message, tools)
-    agent.run()
+    try:
+        agent.run()
+    finally:
+        flush()
 
 
 if __name__ == "__main__":
