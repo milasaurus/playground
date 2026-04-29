@@ -11,7 +11,7 @@ make test                      # Run all tests
 
 Run agent tests only:
 ```bash
-source venv/bin/activate && python -m pytest code_editing_agent/tests/ -v
+uv run python -m pytest code_editing_agent/tests/ -v
 ```
 
 ## Architecture
