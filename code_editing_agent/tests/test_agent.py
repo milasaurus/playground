@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from code_editing_agent.agent import Agent
+from code_editing_agent.agent import Agent, SUMMARY_MODEL
 from code_editing_agent.tool_definitions import Tool, MAX_OUTPUT_CHARS
 
 
@@ -111,6 +111,115 @@ class TestExecuteTool:
     def test_short_tool_output_is_unchanged(self):
         result = self.agent._execute_tool(TOOL_ID, TOOL_NAME, {})
         assert result["content"] == TOOL_RESPONSE
+
+
+# ── _compact_conversation ────────────────────────────────────────────────────
+
+def make_summary_response(text="summary text", output_tokens=42):
+    """Build a fake messages.create() response with .content[0].text and .usage."""
+    block = MagicMock()
+    block.type = "text"
+    block.text = text
+    response = MagicMock()
+    response.content = [block]
+    response.usage.output_tokens = output_tokens
+    return response
+
+
+SAMPLE_CONVERSATION = [
+    {"role": "user", "content": "read agent.py"},
+    {"role": "assistant", "content": "ok"},
+    {"role": "user", "content": "now edit it"},
+    {"role": "assistant", "content": "done"},
+]
+
+
+class TestCompactConversation:
+    def setup_method(self):
+        self.client = MagicMock()
+        self.agent = Agent(self.client, lambda: ("", False), [echo_tool])
+
+    def test_replaces_conversation_with_single_summary_message(self):
+        self.client.messages.create.return_value = make_summary_response(text="THE SUMMARY")
+        conversation = list(SAMPLE_CONVERSATION)
+
+        self.agent._compact_conversation(conversation)
+
+        assert len(conversation) == 1
+        assert conversation[0]["role"] == "user"
+        assert conversation[0]["content"] == "THE SUMMARY"
+
+    def test_confirmation_includes_message_count_and_token_count(self, capsys):
+        self.client.messages.create.return_value = make_summary_response(output_tokens=99)
+        conversation = list(SAMPLE_CONVERSATION)
+
+        self.agent._compact_conversation(conversation)
+
+        out = capsys.readouterr().out
+        assert "4" in out
+        assert "99" in out
+
+    def test_empty_conversation_skips_api_call(self, capsys):
+        conversation: list = []
+
+        self.agent._compact_conversation(conversation)
+
+        self.client.messages.create.assert_not_called()
+        assert conversation == []
+        assert capsys.readouterr().out  # something was printed
+
+    def test_api_error_leaves_conversation_intact(self, capsys):
+        self.client.messages.create.side_effect = RuntimeError("network down")
+        conversation = list(SAMPLE_CONVERSATION)
+
+        self.agent._compact_conversation(conversation)
+
+        assert conversation == SAMPLE_CONVERSATION
+        assert capsys.readouterr().out  # error line printed
+
+    def test_empty_response_content_leaves_conversation_intact(self, capsys):
+        bad_response = MagicMock()
+        bad_response.content = []
+        bad_response.usage.output_tokens = 0
+        self.client.messages.create.return_value = bad_response
+        conversation = list(SAMPLE_CONVERSATION)
+
+        self.agent._compact_conversation(conversation)
+
+        assert conversation == SAMPLE_CONVERSATION
+        assert capsys.readouterr().out
+
+    def test_payload_starts_with_original_messages_and_appends_prompt(self):
+        self.client.messages.create.return_value = make_summary_response()
+        conversation = list(SAMPLE_CONVERSATION)
+
+        self.agent._compact_conversation(conversation)
+
+        kwargs = self.client.messages.create.call_args.kwargs
+        sent = kwargs["messages"]
+        assert sent[: len(SAMPLE_CONVERSATION)] == SAMPLE_CONVERSATION
+        assert sent[-1]["role"] == "user"
+        prompt_text = sent[-1]["content"].lower()
+        for needle in ("200 words", "file", "decision", "todo"):
+            assert needle in prompt_text
+
+    def test_uses_summary_model_not_default(self):
+        self.client.messages.create.return_value = make_summary_response()
+        conversation = list(SAMPLE_CONVERSATION)
+
+        self.agent._compact_conversation(conversation)
+
+        kwargs = self.client.messages.create.call_args.kwargs
+        assert kwargs["model"] == SUMMARY_MODEL
+
+    def test_declares_tools_on_summary_call(self):
+        self.client.messages.create.return_value = make_summary_response()
+        conversation = list(SAMPLE_CONVERSATION)
+
+        self.agent._compact_conversation(conversation)
+
+        kwargs = self.client.messages.create.call_args.kwargs
+        assert kwargs["tools"]  # non-empty
 
 
 # ── run loop ─────────────────────────────────────────────────────────────────
@@ -247,6 +356,107 @@ class TestRunLoop:
         assert client.messages.stream.call_count == 3
         output = capsys.readouterr().out
         assert "all done" in output
+
+    def test_slash_compact_dispatches_and_skips_inference(self, capsys):
+        """User types /compact → _compact_conversation is called, no inference happens."""
+        client = MagicMock()
+        # Stub the summary call so _compact_conversation actually runs end-to-end.
+        client.messages.create.return_value = make_summary_response(text="summary")
+
+        # After /compact, the user quits. No streaming inference should occur.
+        call_count = 0
+        def get_message():
+            nonlocal call_count
+            call_count += 1
+            # Seed the conversation with one normal exchange before /compact,
+            # otherwise the empty-conversation guard short-circuits.
+            if call_count == 1:
+                return "hello", True
+            if call_count == 2:
+                return "/compact", True
+            return "", False
+
+        # Set up the first inference (normal exchange) and the post-compact quit.
+        text_message = MagicMock()
+        text_message.content = [make_text_block("hi")]
+        text_message.stop_reason = "end_turn"
+        client.messages.stream.return_value = make_stream(text_message, text_chunks=["hi"])
+
+        agent = Agent(client, get_message, [echo_tool])
+        agent.run()
+
+        # The summary call happened exactly once; only the pre-compact inference streamed.
+        assert client.messages.create.call_count == 1
+        assert client.messages.stream.call_count == 1
+
+    def test_compact_with_trailing_whitespace_triggers(self, capsys):
+        client = MagicMock()
+        client.messages.create.return_value = make_summary_response()
+
+        # Need a non-empty conversation, so prime with one user turn first.
+        text_message = MagicMock()
+        text_message.content = [make_text_block("ok")]
+        text_message.stop_reason = "end_turn"
+        client.messages.stream.return_value = make_stream(text_message, text_chunks=["ok"])
+
+        call_count = 0
+        def get_message():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return "first", True
+            if call_count == 2:
+                return "/compact   ", True
+            return "", False
+
+        agent = Agent(client, get_message, [echo_tool])
+        agent.run()
+
+        assert client.messages.create.call_count == 1
+
+    def test_compact_without_slash_passes_through(self):
+        """Bare 'compact' is a normal message; no summary call."""
+        client = MagicMock()
+        text_message = MagicMock()
+        text_message.content = [make_text_block("ok")]
+        text_message.stop_reason = "end_turn"
+        client.messages.stream.return_value = make_stream(text_message, text_chunks=["ok"])
+
+        call_count = 0
+        def get_message():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return "compact", True
+            return "", False
+
+        agent = Agent(client, get_message, [])
+        agent.run()
+
+        client.messages.create.assert_not_called()
+        assert client.messages.stream.call_count == 1
+
+    def test_compact_with_args_passes_through(self):
+        """'/compact me please' is not the bare token, so it flows through."""
+        client = MagicMock()
+        text_message = MagicMock()
+        text_message.content = [make_text_block("ok")]
+        text_message.stop_reason = "end_turn"
+        client.messages.stream.return_value = make_stream(text_message, text_chunks=["ok"])
+
+        call_count = 0
+        def get_message():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return "/compact me please", True
+            return "", False
+
+        agent = Agent(client, get_message, [])
+        agent.run()
+
+        client.messages.create.assert_not_called()
+        assert client.messages.stream.call_count == 1
 
     def test_end_turn_without_tools_prompts_user(self, capsys):
         """stop_reason='end_turn' with no tool calls prompts for user input."""
