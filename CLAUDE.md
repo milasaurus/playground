@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-make setup              # Create venv and install dependencies
+make setup              # uv sync — creates .venv/ and resolves uv.lock
 make test               # Run all tests
 make test-chat          # Run conversation engine tests only
 make test-eval          # Run prompt eval tests only
@@ -14,9 +14,16 @@ make prompt             # Run prompt eval (interactive)
 make prompt-verbose     # Run prompt eval with full response details
 ```
 
-Run a single test file:
+Dependencies are managed with [uv](https://docs.astral.sh/uv/). The root `pyproject.toml` covers `claude_conversation_engine`, `claude_prompt_eval`, `code_editing_agent`, and `agent_trace_debugger`. `property_management_agent/` has its own pyproject and uv.lock.
+
+Run a single test file (uv resolves the env automatically — no activation needed):
 ```bash
-source venv/bin/activate && python -m pytest claude_prompt_eval/tests/test_grader.py -v
+uv run python -m pytest claude_prompt_eval/tests/test_grader.py -v
+```
+
+Add a dependency to the shared projects:
+```bash
+uv add <package>        # writes to root pyproject.toml + uv.lock
 ```
 
 ## Architecture
@@ -118,7 +125,7 @@ If yes, simplify.
 ### Tech Stack
 
 - **Runtime**: Python 3.10+
-- **Package Management**: pip + venv
+- **Package Management**: uv (root `pyproject.toml` + `uv.lock`; `property_management_agent/` has its own)
 - **Testing**: pytest
 - **AI SDK**: Anthropic Python SDK
 - **Environment**: python-dotenv
@@ -136,8 +143,8 @@ If yes, simplify.
 ### Boundaries -- Never Modify
 
 - `.env` files during execution
-- `venv/` directory contents
-- `*.lock` files
+- `.venv/` directory contents (managed by uv)
+- `uv.lock` (regenerate via `uv sync` or `uv lock`, never hand-edit)
 
 ### Testing
 

@@ -14,11 +14,15 @@ A collection of projects exploring agentic workflows with the Anthropic Python S
 
 ## Getting Started
 
+Dependencies are managed with [uv](https://docs.astral.sh/uv/). Install it first (`brew install uv` or see the uv docs), then:
+
 ```bash
 git clone https://github.com/milasaurus/playground.git
 cd playground
-make setup
+make setup        # uv sync — creates .venv/ and resolves uv.lock
 ```
+
+`make setup` also installs `property_management_agent`'s separate uv project. The `make` targets all run through `uv run`, so you don't need to activate a venv manually.
 
 Create a `.env` file in the project root with your Anthropic API key:
 

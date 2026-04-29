@@ -1,0 +1,15 @@
+[project]
+name = "claude-playground"
+version = "0.1.0"
+description = "Learning projects exploring the Anthropic Python SDK: conversation engine, prompt eval, code-editing agent, and a TUI trace debugger."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.89.0",
+    "python-dotenv>=1.0",
+    "pytest>=9.0",
+    "rich>=14",
+    "textual>=8",
+    "langfuse>=4",
+    "opentelemetry-instrumentation-anthropic>=0.60",
+]

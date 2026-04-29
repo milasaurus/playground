@@ -46,6 +46,14 @@ Benefits:
   tells it what got cut and how to fetch the rest, so it asks for line
   ranges or pipes through `head` next time.
 
+## Slash commands
+
+| Command | Effect |
+|---------|--------|
+| `/compact` | Summarises the conversation so far (one Haiku call) and replaces it with a single user message containing that summary. The original turns are dropped — there's no undo. Prints `compacted N messages → M tokens` on success. Use it mid-session when context has grown large; the agent keeps running in the same terminal. |
+
+Manual only. There is no auto-compaction, no token-threshold trigger, and no `/clear` — `/compact` on an empty conversation is a no-op, and to truly start over, just restart the process.
+
 ## Adding a tool
 
 1. Subclass `Tool` in `tool_definitions.py` and implement `run(self, params: dict) -> str`

@@ -86,18 +86,17 @@ make debugger Q="What's the capital of France?"
 Or directly:
 
 ```bash
-source venv/bin/activate
-python -m agent_trace_debugger.main "What's the capital of France?"
+uv run python -m agent_trace_debugger.main "What's the capital of France?"
 ```
 
 ### Flags
 
 ```bash
 # Default: run agent, launch the interactive Textual TUI.
-python -m agent_trace_debugger.main "Tell me about Everest."
+uv run python -m agent_trace_debugger.main "Tell me about Everest."
 
 # Print a colour-coded tree to stdout instead (non-TTY / pipes).
-python -m agent_trace_debugger.main --print "..."
+uv run python -m agent_trace_debugger.main --print "..."
 ```
 
 ### Keybindings (TUI)

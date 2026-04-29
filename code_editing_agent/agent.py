@@ -25,6 +25,16 @@ from .tool_definitions import (
 DEFAULT_MODEL = "claude-sonnet-4-6"
 DEFAULT_MAX_TOKENS = 4096
 
+SUMMARY_MODEL = "claude-haiku-4-5-20251001"
+SUMMARY_MAX_TOKENS = 1024
+SUMMARY_PROMPT = (
+    "Summarise this conversation in ~200 words. Preserve every file path "
+    "or file reference mentioned, every decision we made, and every open "
+    "todo or unfinished task. Drop chitchat and verbose tool output. "
+    "Write it as a briefing the assistant can read to pick up where we "
+    "left off."
+)
+
 
 class ToolResult(TypedDict):
     """Shape of the `tool_result` content block sent back to Claude.
@@ -88,6 +98,9 @@ class Agent:
                 user_input, ok = self.get_user_message()
                 if not ok:
                     break
+                if user_input.strip() == "/compact":
+                    self._compact_conversation(conversation)
+                    continue
                 conversation.append({"role": "user", "content": user_input})
 
             message = self._run_inference(conversation)
@@ -116,6 +129,7 @@ class Agent:
             tool_dicts[-1]["cache_control"] = {"type": "ephemeral"}
 
         printed_prefix = False
+
         with self.client.messages.stream(
             model=self.model,
             max_tokens=self.max_tokens,
@@ -132,6 +146,37 @@ class Agent:
                 print()
 
             return stream.get_final_message()
+
+    def _compact_conversation(self, conversation: list[dict[str, Any]]) -> None:
+        """Summarise `conversation` and rewrite it in place to a single user message.
+
+        On empty conversation or any failure (API error, empty/non-text
+        response), the conversation is left untouched and a short status
+        line is printed.
+        """
+        if len(conversation) == 0:
+            print("\033[93mnothing to compact — conversation is empty\033[0m")
+            return
+
+        try:
+            payload = list(conversation) + [
+                {"role": "user", "content": SUMMARY_PROMPT},
+            ]
+            response = self.client.messages.create(
+                model=SUMMARY_MODEL,
+                max_tokens=SUMMARY_MAX_TOKENS,
+                tools=[t.to_api_dict() for t in self.tools],
+                messages=payload,
+            )
+            summary = response.content[0].text
+            n_messages = len(conversation)
+            m_tokens = response.usage.output_tokens
+
+            conversation.clear()
+            conversation.append({"role": "user", "content": summary})
+            print(f"\033[93mcompacted {n_messages} messages → {m_tokens} tokens\033[0m")
+        except Exception as e:
+            print(f"\033[93m/compact failed: {e}\033[0m")
 
     @observe_if_active("execute-tool")
     def _execute_tool(self, tool_id: str, name: str, input: dict[str, Any]) -> ToolResult:
