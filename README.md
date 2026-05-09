@@ -42,6 +42,44 @@ make debugger Q="..."      # Run the agent trace debugger on a question
 make test                  # Run all tests
 ```
 
+## AFK Mode
+
+AFK Mode is a workflow pattern for running coding agents while you're away from your desk — in a meeting, commuting, or otherwise unavailable to supervise.
+
+### How it works
+
+Instead of watching every step of an agent run interactively, you hand the agent a well-defined task and let it work autonomously until it produces a reviewable result (typically a passing test suite and a diff). When you return, you review what it produced rather than what it's currently doing.
+
+### Principles
+
+| Principle | What it means in practice |
+|---|---|
+| **High bar for asking questions** | The agent makes reasonable assumptions on shallow ambiguity and documents them. It only halts for deep conflicts or missing context that would produce materially wrong work. |
+| **Self-resolve where possible** | Read the code, run the tests, check existing patterns before surfacing a question. |
+| **Most reversible path** | When two approaches are equally valid, prefer the one that's easier to undo. |
+| **Green tests before done** | The agent runs the repo's canonical test command (`make test`) and captures pass/fail output before declaring the task complete. |
+| **Halt cleanly when truly blocked** | If a required file is missing, requirements conflict, or an environment problem prevents progress, the agent stops and reports exactly what it tried and what it needs. |
+
+### Good tasks for AFK Mode
+
+- Adding a new feature with clear acceptance criteria
+- Writing or extending tests for an existing module
+- Refactoring a file to match an established pattern elsewhere in the repo
+- Updating documentation to reflect recent code changes
+- Fixing a well-described bug with a reproducible test case
+
+### Less suitable tasks
+
+- Exploratory spikes where the right direction is genuinely unknown
+- Tasks that require human judgement calls mid-run (e.g. "pick whichever design you prefer" on a high-stakes interface)
+- Anything requiring credentials or environment access the agent doesn't already have
+
+### Running an AFK session in this repo
+
+1. Launch the agent with a specific, scoped task.
+2. The agent works, runs `make test`, and documents assumptions in its final response.
+3. You return, read the summary, review the diff, and merge or iterate.
+
 ## Observability and Tracing
 
 Two complementary observability surfaces are available for projects in this repo. They serve different purposes and can run independently or together.
