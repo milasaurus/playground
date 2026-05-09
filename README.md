@@ -12,6 +12,10 @@ A collection of projects exploring agentic workflows with the Anthropic Python S
 | `property_management_agent/` | Agentic tool-calling system that manages inbox, calendar, and property listings for a real estate solopreneur |
 | `agent_trace_debugger/` | Auto-instrumented Claude agent + Textual TUI that captures and visualises decisions, tool calls, and observations |
 
+## AFK Mode
+
+Enable AFK Mode in the [Claude.ai settings](https://claude.ai) under **Feature Preview** to let Claude work autonomously on tasks while you're away.
+
 ## Getting Started
 
 Dependencies are managed with [uv](https://docs.astral.sh/uv/). Install it first (`brew install uv` or see the uv docs), then:
