@@ -86,3 +86,5 @@ Reference implementation: `code_editing_agent/agent.py` (`make coder` is Langfus
 | Filter traces by user, session, or tag | Langfuse |
 | Quick local debugging with no external deps | Local trace debugger |
 | Both at once on a single run | Wire both into the entry point |
+
+AFK demo marker e2e-router-69ab89da
