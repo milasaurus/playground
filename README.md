@@ -42,6 +42,35 @@ make debugger Q="..."      # Run the agent trace debugger on a question
 make test                  # Run all tests
 ```
 
+## AFK Mode
+
+AFK Mode is a way to keep work moving while you're away from your desk — in a meeting, commuting, or otherwise unable to supervise an agent run. Instead of waiting for you to respond to questions, the agent is expected to make reasonable decisions independently and deliver a reviewable result when you return.
+
+### How it works
+
+1. **You kick off a task** with enough context for the agent to proceed — a clear goal, relevant constraints, and any hard requirements.
+2. **The agent works autonomously** — reads code, runs tests, makes decisions on ambiguous but shallow questions (naming, style, library choice), and takes the most reversible path when uncertain.
+3. **The agent halts cleanly on genuine blockers** — conflicting requirements, missing context that changes intent, or irreversible operations it can't confidently proceed with. It surfaces exactly what blocked it and what it tried.
+4. **You review on return** — the agent's final response summarises what it did, the assumptions it made, test results, and any follow-ups for you to consider.
+
+### Bar for escalation
+
+The bar for surfacing a question mid-run is **high**. Shallow ambiguity (style, naming, file layout, obvious library choice) is resolved by the agent. Escalation is reserved for deep ambiguity where any choice could produce materially wrong work:
+
+| Resolve autonomously | Escalate |
+|---|---|
+| Naming and style choices | Conflicting hard requirements |
+| Which of two equivalent libraries to use | Missing context that changes intent |
+| File layout when a clear convention exists | Destructive operations with real uncertainty |
+| Minor API shape decisions | Security-sensitive choices without a clear owner |
+
+### Tips for good AFK Mode tasks
+
+- State the goal and success criteria clearly upfront.
+- Mention hard constraints (e.g. "don't change the public API", "keep changes inside `src/`").
+- Point to relevant files or prior art so the agent doesn't have to guess context.
+- Prefer tasks where the test suite can verify correctness — the agent will run it and report results.
+
 ## Observability and Tracing
 
 Two complementary observability surfaces are available for projects in this repo. They serve different purposes and can run independently or together.
