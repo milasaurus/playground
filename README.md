@@ -86,3 +86,65 @@ Reference implementation: `code_editing_agent/agent.py` (`make coder` is Langfus
 | Filter traces by user, session, or tag | Langfuse |
 | Quick local debugging with no external deps | Local trace debugger |
 | Both at once on a single run | Wire both into the entry point |
+
+## AFK Mode
+
+AFK Mode lets you hand a task to the coding agent and walk away — no supervision required. The agent works autonomously, resolves ambiguity on its own, runs the test suite, and leaves a written summary for you to review when you return.
+
+### How it works
+
+- **High autonomy** — the agent reads code, runs commands, makes edits, and self-corrects without asking for confirmation on every step.
+- **Low interruption** — it only escalates when genuinely blocked (conflicting requirements, missing secrets, destructive operations with no safe default). Shallow ambiguity (naming, style, library choice) is resolved independently with a note in the final summary.
+- **Test-gated** — before declaring work done the agent runs `make test` and reports pass/fail. If tests fail it attempts to fix them; unresolved failures are listed explicitly.
+- **Documented handoff** — the final response summarises what was done, what assumptions were made, and any follow-ups the engineer may want to address.
+
+### Enabling AFK Mode
+
+AFK Mode is a prompt-level instruction — no code changes or environment variables are needed.
+
+1. **Open a Claude session** (claude.ai/code or the API).
+2. **Paste the AFK Mode system prompt** at the start of your conversation (or configure it as the system prompt in your API call):
+
+   > *You are a coding agent operating in AFK Mode. [full AFK Mode instructions…]*
+
+3. **Give your task** as the first human message, then step away. Claude will work through the task, run `make test`, and post a final summary.
+
+#### Quick-start via the API
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+response = client.messages.create(
+    model="claude-opus-4-5",
+    max_tokens=8096,
+    system=(
+        "You are a coding agent operating in AFK Mode. "
+        "Work autonomously, resolve shallow ambiguity independently, "
+        "run the repo's test suite before finishing, and post a plain-text "
+        "summary of what you did, what you assumed, and any follow-ups."
+    ),
+    messages=[
+        {"role": "user", "content": "Refactor the retry logic in code_editing_agent/agent.py and make sure all tests pass."}
+    ],
+)
+print(response.content[0].text)
+```
+
+#### Via `claude.ai/code`
+
+1. Go to **claude.ai/code** and open (or create) a project.
+2. In **Project instructions**, paste the AFK Mode system prompt.
+3. Type your task in the chat and close the tab — the agent will keep working.
+
+### When to use AFK Mode vs. interactive mode
+
+| Situation | Recommended mode |
+|---|---|
+| Well-defined task you can describe in a sentence or two | AFK Mode |
+| You need to review design decisions as they're made | Interactive |
+| Running the test suite validates the outcome automatically | AFK Mode |
+| The task requires frequent back-and-forth clarification | Interactive |
+| You're away from your desk or on a small screen | AFK Mode |
+| Exploratory / research work where direction may shift | Interactive |
