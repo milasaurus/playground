@@ -42,6 +42,40 @@ make debugger Q="..."      # Run the agent trace debugger on a question
 make test                  # Run all tests
 ```
 
+## Running Tests
+
+The repo ships with two independent test surfaces — the root project (covering four packages) and the `property_management_agent` sub-project, which has its own `pyproject.toml` and `uv.lock`.
+
+### Run every test at once
+
+```bash
+make test                  # root: claude_conversation_engine, claude_prompt_eval,
+                           #        code_editing_agent, agent_trace_debugger (118 tests)
+make test-property-agent   # property_management_agent sub-project
+```
+
+### Run tests for a single package
+
+```bash
+make test-chat             # claude_conversation_engine only
+make test-eval             # claude_prompt_eval only
+make test-coder            # code_editing_agent only
+make test-debugger         # agent_trace_debugger only
+```
+
+### Run a single test file or test
+
+```bash
+uv run python -m pytest claude_prompt_eval/tests/test_grader.py -v
+uv run python -m pytest claude_conversation_engine/tests/test_history.py::test_add_stores_message -v
+```
+
+### What to expect
+
+All tests mock the Anthropic API — no real network calls or API key are required to run them. A full `make test` pass completes in roughly 3–4 seconds and should report **118 passed**.
+
+> **Property management agent tests** live in a sub-project. They are invoked via `make test-property-agent`, which delegates to `property_management_agent/Makefile` and uses that directory's own virtual environment.
+
 ## Observability and Tracing
 
 Two complementary observability surfaces are available for projects in this repo. They serve different purposes and can run independently or together.
