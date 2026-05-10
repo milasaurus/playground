@@ -1,5 +1,7 @@
 # Playground
 
+Hands-on Python projects that explore how to build, evaluate, and debug AI agents using the Anthropic Claude API.
+
 A collection of projects exploring agentic workflows with the Anthropic Python SDK.
 
 ## Projects
