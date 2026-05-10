@@ -1,5 +1,7 @@
 # Playground
 
+Tests span unit tests (mocked, no API calls), tool-level tests, and end-to-end integration tests across all projects.
+
 A collection of projects exploring agentic workflows with the Anthropic Python SDK.
 
 ## Projects
