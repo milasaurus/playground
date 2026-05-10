@@ -35,6 +35,39 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run the agent trace debugger.
+
+    Parses command-line arguments and either:
+
+    * Runs the ``ResearchAgent`` against the Anthropic API for a given
+      *question*, captures the full execution trace, and then displays it; or
+    * Loads a previously-saved trace from a JSON file on disk.
+
+    After the trace is obtained, it is presented in one of two ways:
+
+    * **TUI** (default) – an interactive Textual terminal UI launched via
+      :func:`~agent_trace_debugger.tui.run_tui`.
+    * **stdout tree** – a colour-coded tree printed to standard output via
+      :func:`~agent_trace_debugger.tui.print_trace` when ``--print`` is
+      supplied (useful for pipes and non-TTY contexts).
+
+    Command-line arguments (parsed by :func:`parse_args`):
+
+    ``question`` *(positional, optional)*
+        The natural-language question to send to the research agent.
+        Required unless ``--load`` is provided.
+
+    ``--load PATH``
+        Path to a previously-saved trace JSON file.  When given, the agent
+        is **not** invoked; the trace is loaded directly from disk.
+
+    ``--print``
+        Print a colour-coded tree to stdout instead of launching the
+        interactive TUI.  Exits after printing; no TTY required.
+
+    Exits with status 2 if ``question`` is omitted and ``--load`` is not
+    supplied.
+    """
     args = parse_args()
 
     if args.load:
