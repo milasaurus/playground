@@ -42,6 +42,10 @@ make debugger Q="..."      # Run the agent trace debugger on a question
 make test                  # Run all tests
 ```
 
+## Handling Failures in AFK Mode
+
+Fix what you can; document the rest.
+
 ## Observability and Tracing
 
 Two complementary observability surfaces are available for projects in this repo. They serve different purposes and can run independently or together.
