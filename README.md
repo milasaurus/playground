@@ -1,5 +1,7 @@
 # Playground
 
+> **Using the code-editing agent skills:** run `make coder` from the repo root to start the terminal agent, then type a task — Claude will use its file tools (`read_file`, `list_files`, `edit_file`) to read, navigate, and modify code in the current directory on your behalf.
+
 A collection of projects exploring agentic workflows with the Anthropic Python SDK.
 
 ## Projects
