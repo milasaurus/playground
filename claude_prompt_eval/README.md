@@ -2,6 +2,8 @@
 
 > Score a system prompt and get recommendations to improve it.
 
+`api/` handles Claude calls; `services/` orchestrates evaluation logic.
+
 ## Getting started
 
 1. Set up the environment (if you haven't already):
