@@ -1,5 +1,7 @@
 # Prompt Eval
 
+> **Auto-generates test cases for a system prompt, runs them against Claude, scores each response, and returns 3 actionable recommendations to improve your prompt.**
+
 > Score a system prompt and get recommendations to improve it.
 
 ## Getting started
