@@ -2,6 +2,8 @@
 
 A collection of projects exploring agentic workflows with the Anthropic Python SDK.
 
+> Each project lives in its own top-level directory with its own tests, README, and `make` targets wired through a shared root `Makefile`.
+
 ## Projects
 
 | Directory | Description |
