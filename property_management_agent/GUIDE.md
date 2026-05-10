@@ -2,9 +2,34 @@
 
 ## Setup
 
+### Option 1 — UV (recommended)
+
     make setup
 
 This runs `uv sync` to create a virtual environment and install dependencies.
+
+### Option 2 — pip (if you don't have UV installed)
+
+Ensure you are using **Python 3.14 or later**, then create and activate a virtual environment manually:
+
+```bash
+python3 --version          # confirm 3.14+
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Once the environment is active, replace every `make` target's underlying `uv run` call with a direct `python` invocation:
+
+| Task | UV (make) | pip alternative |
+|---|---|---|
+| Seed databases | `make seed` | `python seed_data.py` |
+| Start the CLI | `make run` | `python seed_data.py && python main.py` |
+| Run tests | `make test` | `python -m pytest tests/ -v` |
+
+> **Note:** `requirements.txt` is generated from `pyproject.toml` and is the pip-compatible source of truth for dependencies.
+
+### API key
 
 You'll need an `ANTHROPIC_API_KEY` environment variable set:
 
