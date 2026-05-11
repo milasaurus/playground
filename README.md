@@ -1,5 +1,8 @@
 # Playground
 
+> **To use the loaded skills:** Run `make coder` from the repo root to start the code-editing agent, then type your request — Claude can read, list, and edit files in your project via tool calls.
+> Subclass `Tool` in `code_editing_agent/tool_definitions.py` and add your instance to the tools list in `main()` to extend the agent with new skills.
+
 A collection of projects exploring agentic workflows with the Anthropic Python SDK.
 
 ## Projects
