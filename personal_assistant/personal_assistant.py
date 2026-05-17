@@ -17,8 +17,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from observability import setup_langfuse, flush
 
 from tool import Tool
-from calendar_tools import CreateCalendarEventTool, GetAvailableTimeSlotsTool
-from messaging_tools import SendEmailTool
+from calendar_tools import CreateCalendarEventTool, GetAvailableTimeSlotsTool, ReportCalendarResultTool
+from messaging_tools import SendEmailTool, ReportEmailResultTool
 from agent_prompts import CALENDAR_AGENT_PROMPT, EMAIL_AGENT_PROMPT, SUPERVISOR_PROMPT
 from schemas import CalendarAgentOutput, EmailAgentOutput
 
@@ -28,6 +28,9 @@ MODEL = "claude-sonnet-4-6"
 
 
 # --- Agent ---
+
+COMPLETION_TOOL = "report_result"
+
 
 class Agent:
     def __init__(self, system_prompt: str, tools: list[Tool]) -> None:
@@ -60,6 +63,12 @@ class Agent:
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
+                    # Completion tool: return its input directly as structured JSON,
+                    # bypassing prose generation entirely.
+                    if block.name == COMPLETION_TOOL:
+                        self._set_state(COMPLETION_TOOL, "completed", json.dumps(block.input))
+                        return json.dumps(block.input)
+
                     self._set_state(block.name, "in_progress")
                     try:
                         result = self.tools[block.name].run(block.input)
@@ -141,13 +150,13 @@ class MessageEmailTool(Tool):
 # Handles scheduling requests: parses natural language dates, checks availability, and creates events.
 calendar_agent = Agent(
     system_prompt=CALENDAR_AGENT_PROMPT,
-    tools=[CreateCalendarEventTool(), GetAvailableTimeSlotsTool()],
+    tools=[CreateCalendarEventTool(), GetAvailableTimeSlotsTool(), ReportCalendarResultTool()],
 )
 
 # Handles email requests: composes and sends professional emails from natural language instructions.
 email_agent = Agent(
     system_prompt=EMAIL_AGENT_PROMPT,
-    tools=[SendEmailTool()],
+    tools=[SendEmailTool(), ReportEmailResultTool()],
 )
 
 

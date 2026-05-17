@@ -1,5 +1,6 @@
 """Calendar tools: create events and check availability. Stubs for Google Calendar / Outlook API calls."""
 
+import json
 from typing import Any
 
 from tool import Tool
@@ -49,3 +50,27 @@ class GetAvailableTimeSlotsTool(Tool):
 
     def run(self, params: dict[str, Any]) -> str:
         return str(["09:00", "14:00", "16:00"])
+
+
+class ReportCalendarResultTool(Tool):
+    def __init__(self) -> None:
+        super().__init__(
+            name="report_result",
+            description="Report the final result of your work. You MUST call this tool to complete your task.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "enum": ["success", "unavailable", "failed"]},
+                    "event_title": {"type": "string"},
+                    "date": {"type": "string"},
+                    "start_time": {"type": "string"},
+                    "end_time": {"type": "string"},
+                    "attendees": {"type": "array", "items": {"type": "string"}},
+                    "error": {"type": "string"},
+                },
+                "required": ["status"],
+            },
+        )
+
+    def run(self, params: dict[str, Any]) -> str:
+        return json.dumps(params)

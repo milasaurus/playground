@@ -1,5 +1,6 @@
 """Messaging tools: send emails. Stub for SendGrid / Gmail API calls."""
 
+import json
 from typing import Any
 
 from tool import Tool
@@ -26,3 +27,25 @@ class SendEmailTool(Tool):
         to = params["to"]
         subject = params["subject"]
         return f"Email sent to {', '.join(to)} - Subject: {subject}"
+
+
+class ReportEmailResultTool(Tool):
+    def __init__(self) -> None:
+        super().__init__(
+            name="report_result",
+            description="Report the final result of your work. You MUST call this tool to complete your task.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "enum": ["success", "failed"]},
+                    "recipients": {"type": "array", "items": {"type": "string"}},
+                    "subject": {"type": "string"},
+                    "body_summary": {"type": "string"},
+                    "error": {"type": "string"},
+                },
+                "required": ["status"],
+            },
+        )
+
+    def run(self, params: dict[str, Any]) -> str:
+        return json.dumps(params)
