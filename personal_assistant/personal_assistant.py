@@ -16,7 +16,7 @@ from pydantic import ValidationError
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from observability import setup_langfuse, flush
 
-from tool import Tool
+from tool import Tool, COMPLETION_TOOL_NAME
 from calendar_tools import CreateCalendarEventTool, GetAvailableTimeSlotsTool, ReportCalendarResultTool
 from messaging_tools import SendEmailTool, ReportEmailResultTool
 from agent_prompts import CALENDAR_AGENT_PROMPT, EMAIL_AGENT_PROMPT, SUPERVISOR_PROMPT
@@ -29,7 +29,7 @@ MODEL = "claude-sonnet-4-6"
 
 # --- Agent ---
 
-COMPLETION_TOOL = "report_result"
+COMPLETION_TOOL = COMPLETION_TOOL_NAME
 
 
 class Agent:
@@ -42,7 +42,8 @@ class Agent:
 
     def _set_state(self, tool_name: str, status: str, result: str | None = None) -> None:
         self.state[tool_name] = {"status": status, "result": result}
-        print(f"[{tool_name}] {status}" + (f": {result[:80]}..." if result and len(result) > 80 else f": {result}" if result else ""))
+        suffix = f": {result[:80]}..." if result and len(result) > 80 else f": {result}" if result else ""
+        print(f"[{tool_name}] {status}{suffix}")
 
     def run(self, user_message: str) -> str:
         self.messages.append({"role": "user", "content": user_message})
@@ -60,27 +61,34 @@ class Agent:
             if response.stop_reason != "tool_use":
                 return next(b.text for b in response.content if b.type == "text")
 
+            # Separate completion tool from regular tools so regular calls are
+            # never silently dropped if both appear in the same response.
             tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    # Completion tool: return its input directly as structured JSON,
-                    # bypassing prose generation entirely.
-                    if block.name == COMPLETION_TOOL:
-                        self._set_state(COMPLETION_TOOL, "completed", json.dumps(block.input))
-                        return json.dumps(block.input)
+            completion_block = None
 
-                    self._set_state(block.name, "in_progress")
-                    try:
-                        result = self.tools[block.name].run(block.input)
-                        self._set_state(block.name, "completed", result)
-                    except Exception as e:
-                        result = f"error: {e}"
-                        self._set_state(block.name, "failed", result)
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result,
-                    })
+            for block in response.content:
+                if block.type != "tool_use":
+                    continue
+                if block.name == COMPLETION_TOOL:
+                    completion_block = block
+                    continue
+
+                self._set_state(block.name, "in_progress")
+                try:
+                    result = self.tools[block.name].run(block.input)
+                    self._set_state(block.name, "completed", result)
+                except Exception as e:
+                    result = f"error: {e}"
+                    self._set_state(block.name, "failed", result)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result,
+                })
+
+            if completion_block is not None:
+                self._set_state(COMPLETION_TOOL, "completed", json.dumps(completion_block.input))
+                return json.dumps(completion_block.input)
 
             self.messages.append({"role": "user", "content": tool_results})
 

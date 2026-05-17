@@ -5,6 +5,8 @@ from typing import Any
 
 from anthropic.types import ToolParam
 
+COMPLETION_TOOL_NAME = "report_result"
+
 
 class Tool(ABC):
     def __init__(self, name: str, description: str, input_schema: dict[str, Any]) -> None:
