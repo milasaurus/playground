@@ -1,1 +1,4 @@
 anthropic
+pydantic
+langfuse
+opentelemetry-instrumentation-anthropic
