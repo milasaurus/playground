@@ -4,14 +4,25 @@ scheduling and email. The supervisor sees only high-level tools (schedule_event,
 the low-level API tools are hidden inside each sub-agent.
 """
 
+import json
+import os
+import sys
 from typing import Any
 import anthropic
+from pydantic import ValidationError
+
+# Import shared observability from playground root. Must run before client construction
+# so the OTEL instrumentation patches the Anthropic SDK in time.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from observability import setup_langfuse, flush
 
 from tool import Tool
 from calendar_tools import CreateCalendarEventTool, GetAvailableTimeSlotsTool
 from messaging_tools import SendEmailTool
 from agent_prompts import CALENDAR_AGENT_PROMPT, EMAIL_AGENT_PROMPT, SUPERVISOR_PROMPT
+from schemas import CalendarAgentOutput, EmailAgentOutput
 
+setup_langfuse()
 client = anthropic.Anthropic()
 MODEL = "claude-sonnet-4-6"
 
@@ -24,6 +35,11 @@ class Agent:
         self.tools = {t.name: t for t in tools}
         self.tool_defs = [t.to_api_dict() for t in tools]
         self.messages: list[dict] = []
+        self.state: dict[str, dict] = {}
+
+    def _set_state(self, tool_name: str, status: str, result: str | None = None) -> None:
+        self.state[tool_name] = {"status": status, "result": result}
+        print(f"[{tool_name}] {status}" + (f": {result[:80]}..." if result and len(result) > 80 else f": {result}" if result else ""))
 
     def run(self, user_message: str) -> str:
         self.messages.append({"role": "user", "content": user_message})
@@ -44,7 +60,13 @@ class Agent:
             tool_results = []
             for block in response.content:
                 if block.type == "tool_use":
-                    result = self.tools[block.name].run(block.input)
+                    self._set_state(block.name, "in_progress")
+                    try:
+                        result = self.tools[block.name].run(block.input)
+                        self._set_state(block.name, "completed", result)
+                    except Exception as e:
+                        result = f"error: {e}"
+                        self._set_state(block.name, "failed", result)
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,
@@ -77,7 +99,12 @@ class ScheduleEventTool(Tool):
         )
 
     def run(self, params: dict[str, Any]) -> str:
-        return self.agent.run(params["request"])
+        raw = self.agent.run(params["request"])
+        try:
+            output = CalendarAgentOutput.model_validate_json(raw)
+        except (ValidationError, json.JSONDecodeError):
+            return json.dumps({"status": "failed", "error": f"malformed response: {raw[:200]}"})
+        return output.model_dump_json()
 
 
 class MessageEmailTool(Tool):
@@ -101,7 +128,12 @@ class MessageEmailTool(Tool):
         )
 
     def run(self, params: dict[str, Any]) -> str:
-        return self.agent.run(params["request"])
+        raw = self.agent.run(params["request"])
+        try:
+            output = EmailAgentOutput.model_validate_json(raw)
+        except (ValidationError, json.JSONDecodeError):
+            return json.dumps({"status": "failed", "error": f"malformed response: {raw[:200]}"})
+        return output.model_dump_json()
 
 
 # --- Sub-agents ---
@@ -136,5 +168,8 @@ if __name__ == "__main__":
         "Then send them an email reminder about reviewing the new mockups."
     )
     print(f"Query: {query}\n")
-    result = supervisor.run(query)
-    print(f"Response: {result}")
+    try:
+        result = supervisor.run(query)
+        print(f"Response: {result}")
+    finally:
+        flush()
